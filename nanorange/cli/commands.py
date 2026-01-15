@@ -2,7 +2,7 @@
 CLI commands for NanoRange.
 
 Provides commands for:
-- Starting the orchestrator agent
+- Starting the orchestrator agent (with different modes)
 - Managing pipelines
 - Listing tools
 """
@@ -12,12 +12,12 @@ import os
 import click
 from dotenv import load_dotenv
 from rich.console import Console
-
-# Load environment variables from .env file
-load_dotenv()
 from rich.table import Table
 from rich.panel import Panel
 from rich.markdown import Markdown
+
+# Load environment variables from .env file
+load_dotenv()
 
 console = Console()
 
@@ -40,8 +40,14 @@ def cli():
     default=None,
     help="Resume an existing session"
 )
-def chat(model: str, session: str):
-    """Start an interactive chat session with the orchestrator."""
+@click.option(
+    "--mode",
+    type=click.Choice(["full", "planner", "executor"]),
+    default="full",
+    help="Agent mode: full (planner+executor), planner only, or executor only"
+)
+def chat(model: str, session: str, mode: str):
+    """Start an interactive chat session with the NanoRange agents."""
     from nanorange.agent.orchestrator import NanoRangeOrchestrator
     from nanorange.storage.database import init_database
     
@@ -49,18 +55,31 @@ def chat(model: str, session: str):
     init_database()
     
     # Create orchestrator
-    orchestrator = NanoRangeOrchestrator(model=model, session_id=session)
+    orchestrator = NanoRangeOrchestrator(model=model, session_id=session, mode=mode)
+    
+    mode_description = {
+        "full": "Full System (Planner + Executor)",
+        "planner": "Planner Only (design pipelines)",
+        "executor": "Executor Only (run pipelines)",
+    }
     
     console.print(Panel.fit(
-        "[bold blue]NanoRange[/bold blue] - Microscopy Image Analysis Assistant\n"
-        f"Session: {orchestrator.get_session_id()}\n"
-        "Type 'exit' or 'quit' to end the session.\n"
-        "Type 'help' for available commands.",
+        "[bold blue]NanoRange[/bold blue] - Microscopy Image Analysis\n"
+        f"Mode: {mode_description[mode]}\n"
+        f"Session: {orchestrator.get_session_id()}\n\n"
+        "Commands:\n"
+        "  'exit' or 'quit' - End session\n"
+        "  'help' - Show help\n"
+        "  'image <path>' - Attach image to next message",
         title="Welcome"
     ))
     
+    pending_image = None
+    
     async def run_chat():
         """Run the async chat loop."""
+        nonlocal pending_image
+        
         try:
             while True:
                 try:
@@ -71,7 +90,17 @@ def chat(model: str, session: str):
                         break
                     
                     if user_input.lower() == 'help':
-                        _show_help()
+                        _show_help(mode)
+                        continue
+                    
+                    if user_input.lower().startswith('image '):
+                        image_path = user_input[6:].strip()
+                        if os.path.exists(image_path):
+                            pending_image = image_path
+                            console.print(f"[cyan]Image attached: {image_path}[/cyan]")
+                            console.print("[cyan]Now type your message about this image.[/cyan]")
+                        else:
+                            console.print(f"[red]Image not found: {image_path}[/red]")
                         continue
                     
                     if not user_input.strip():
@@ -79,7 +108,13 @@ def chat(model: str, session: str):
                     
                     # Get response from orchestrator
                     with console.status("[bold blue]Thinking...[/bold blue]"):
-                        response = await orchestrator.chat(user_input)
+                        if pending_image:
+                            response = await orchestrator.chat_with_image(
+                                user_input, pending_image
+                            )
+                            pending_image = None
+                        else:
+                            response = await orchestrator.chat(user_input)
                     
                     console.print(f"\n[bold blue]NanoRange:[/bold blue] {response}")
                     
@@ -95,26 +130,66 @@ def chat(model: str, session: str):
     asyncio.run(run_chat())
 
 
-def _show_help():
+def _show_help(mode: str):
     """Show help information."""
-    help_text = """
-## Available Commands
+    if mode == "planner":
+        help_text = """
+## Planner Mode
 
-In the chat, you can ask the assistant to:
+The Planner Agent analyzes your requests and images to design pipelines.
 
-- **List tools**: "Show me available preprocessing tools"
-- **Build pipeline**: "Create a pipeline for nuclei segmentation"
-- **Execute**: "Run the pipeline on my image"
-- **Modify**: "Increase the threshold value"
-- **Save**: "Save this pipeline as 'nuclei_counter'"
-- **Load**: "Load my saved pipeline 'nuclei_counter'"
+### Commands
+- **Analyze image**: "Analyze this image" (after attaching with 'image <path>')
+- **List tools**: "What tools are available?"
+- **Design pipeline**: "Create a pipeline to segment cells"
 
-## Tips
+### Tips
+- Attach images with 'image <path>' before asking for analysis
+- Ask about specific tool categories: preprocessing, segmentation, etc.
+- The planner will explain its reasoning
+        """
+    elif mode == "executor":
+        help_text = """
+## Executor Mode
 
-- Be specific about what you want to analyze
-- Ask about parameters if results aren't good
+The Executor Agent builds and runs pipelines.
+
+### Commands
+- **Build pipeline**: "Create a pipeline called 'test'"
+- **Add step**: "Add a gaussian blur step"
+- **Execute**: "Run the pipeline"
+- **Save**: "Save this pipeline as 'my_workflow'"
+- **Load**: "Load the pipeline 'my_workflow'"
+
+### Tips
+- Build pipelines step by step
+- Always validate before executing
 - Save successful pipelines for reuse
-    """
+        """
+    else:
+        help_text = """
+## Full Mode (Planner + Executor)
+
+The complete NanoRange system with coordinated agents.
+
+### Workflow
+1. Describe what you want to analyze
+2. Attach an image with 'image <path>' if relevant
+3. The Planner will design a pipeline
+4. Approve the plan
+5. The Executor will run it
+
+### Commands
+- **New analysis**: "I want to count cells in my fluorescence image"
+- **Attach image**: 'image /path/to/image.png'
+- **Approve plan**: "Looks good, run it"
+- **Save result**: "Save this pipeline"
+
+### Tips
+- Be specific about what you want to measure
+- The Planner will ask clarifying questions
+- You can modify plans before execution
+        """
     console.print(Markdown(help_text))
 
 
@@ -145,6 +220,7 @@ def tools(category: str):
     table.add_column("ID", style="cyan")
     table.add_column("Name", style="green")
     table.add_column("Category", style="yellow")
+    table.add_column("Type", style="magenta")
     table.add_column("Description")
     
     for tool in tool_list:
@@ -152,7 +228,8 @@ def tools(category: str):
             tool.tool_id,
             tool.name,
             tool.category,
-            tool.description[:50] + "..." if len(tool.description) > 50 else tool.description
+            tool.type.value,
+            tool.description[:40] + "..." if len(tool.description) > 40 else tool.description
         )
     
     console.print(table)

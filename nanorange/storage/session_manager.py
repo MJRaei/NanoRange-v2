@@ -103,7 +103,7 @@ class SessionManager:
             # Update existing
             existing.name = pipeline.name
             existing.description = pipeline.description
-            existing.definition = pipeline.model_dump()
+            existing.definition = pipeline.model_dump(mode='json')
             existing.modified_at = datetime.utcnow()
         else:
             # Create new

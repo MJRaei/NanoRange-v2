@@ -152,8 +152,8 @@ def get_tool_details(tool_id: str) -> Dict[str, Any]:
         "category": schema.category,
         "version": schema.version,
         "tags": schema.tags,
-        "inputs": [inp.model_dump() for inp in schema.inputs],
-        "outputs": [out.model_dump() for out in schema.outputs],
+        "inputs": [inp.model_dump(mode='json') for inp in schema.inputs],
+        "outputs": [out.model_dump(mode='json') for out in schema.outputs],
     }
 
 

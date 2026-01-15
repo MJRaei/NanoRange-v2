@@ -14,9 +14,9 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
 # Model Configuration
-DEFAULT_LLM_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+DEFAULT_LLM_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-pro-preview")
 IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
-IMAGE_MODEL_COLORIZER = os.getenv("GEMINI_IMAGE_MODEL_COLORIZER", "gemini-2.5-flash-image")
+IMAGE_MODEL_COLORIZER = os.getenv("GEMINI_IMAGE_MODEL_COLORIZER", "gemini-3-pro-image-preview")
 
 # Storage Configuration
 DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/nanorange.db")

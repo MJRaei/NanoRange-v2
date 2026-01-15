@@ -102,8 +102,9 @@ class PipelineValidator:
     """Validates pipeline definitions."""
     
     # Types that are compatible (can be connected)
+    # Key = target input type, Value = set of source output types it can accept
     TYPE_COMPATIBILITY: Dict[DataType, Set[DataType]] = {
-        DataType.IMAGE: {DataType.IMAGE, DataType.PATH},
+        DataType.IMAGE: {DataType.IMAGE, DataType.PATH, DataType.MASK},  # Mask is a binary image
         DataType.MASK: {DataType.MASK, DataType.IMAGE, DataType.PATH},
         DataType.PATH: {DataType.PATH, DataType.IMAGE, DataType.MASK, DataType.STRING},
         DataType.ARRAY: {DataType.ARRAY},
