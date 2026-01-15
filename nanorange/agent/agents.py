@@ -137,14 +137,11 @@ def create_root_agent(model: str = "gemini-2.0-flash") -> Agent:
     Returns:
         Configured Root Agent with sub-agents
     """
-    # Initialize session for tools
     initialize_session()
     
-    # Create sub-agents
     planner = create_planner_agent(model)
     executor = create_executor_agent(model)
     
-    # Create root agent with sub-agents
     return Agent(
         model=model,
         name="nanorange_coordinator",

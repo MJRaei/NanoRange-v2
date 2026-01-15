@@ -16,7 +16,6 @@ from nanorange.core.executor import PipelineExecutor
 from nanorange.storage.session_manager import SessionManager
 
 
-# Global state for the current session
 _current_manager: Optional[PipelineManager] = None
 _current_session: Optional[SessionManager] = None
 _current_executor: Optional[PipelineExecutor] = None
@@ -59,7 +58,6 @@ def initialize_session(session_id: Optional[str] = None) -> str:
     """
     global _current_session, _current_manager
     
-    # Discover and register built-in tools
     registry = get_registry()
     registry.discover_tools()
     
@@ -72,10 +70,6 @@ def initialize_session(session_id: Optional[str] = None) -> str:
     _current_manager = PipelineManager()
     return _current_session.session_id
 
-
-# ============================================================================
-# Tool Discovery
-# ============================================================================
 
 def list_available_tools(category: Optional[str] = None) -> Dict[str, Any]:
     """
@@ -156,10 +150,6 @@ def get_tool_details(tool_id: str) -> Dict[str, Any]:
         "outputs": [out.model_dump(mode='json') for out in schema.outputs],
     }
 
-
-# ============================================================================
-# Pipeline Building
-# ============================================================================
 
 def new_pipeline(name: str = "New Pipeline", description: str = "") -> Dict[str, Any]:
     """
@@ -333,10 +323,6 @@ def remove_step(step: str) -> Dict[str, Any]:
         return {"status": "error", "message": f"Step not found: {step}"}
 
 
-# ============================================================================
-# Pipeline Validation & Execution
-# ============================================================================
-
 def validate_pipeline() -> Dict[str, Any]:
     """
     Validate the current pipeline.
@@ -381,7 +367,6 @@ def execute_pipeline(
     if not manager.current_pipeline:
         return {"status": "error", "message": "No active pipeline"}
     
-    # Validate first
     validation = manager.validate()
     if not validation.is_valid:
         return {
@@ -389,19 +374,16 @@ def execute_pipeline(
             "errors": [str(e) for e in validation.errors],
         }
     
-    # Execute
     result = executor.execute(
         manager.current_pipeline,
         user_inputs=user_inputs,
         stop_on_error=stop_on_error
     )
     
-    # Save result to session
     session = _get_session()
     session.save_pipeline(manager.current_pipeline)
     session.save_result(result)
     
-    # Format response
     step_summaries = []
     for sr in result.step_results:
         step_summaries.append({
@@ -464,10 +446,6 @@ def get_pipeline_summary() -> Dict[str, Any]:
     manager = _get_manager()
     return manager.get_pipeline_summary()
 
-
-# ============================================================================
-# Pipeline Persistence
-# ============================================================================
 
 def save_pipeline(name: str, description: str = "") -> Dict[str, Any]:
     """

@@ -39,7 +39,7 @@ class NanoRangeOrchestrator:
         self,
         model: str = "gemini-2.0-flash",
         session_id: Optional[str] = None,
-        mode: str = "full"  # "full", "planner", "executor"
+        mode: str = "full"
     ):
         """
         Initialize the orchestrator.
@@ -56,7 +56,6 @@ class NanoRangeOrchestrator:
         self.mode = mode
         self.nano_session_id = initialize_session(session_id)
         
-        # Create appropriate agent based on mode
         if mode == "planner":
             self.agent = create_standalone_planner(model)
         elif mode == "executor":
@@ -68,7 +67,6 @@ class NanoRangeOrchestrator:
         self.user_id = "nanorange_user"
         self.adk_session_id = str(uuid4())
         
-        # Create runner
         self.runner = InMemoryRunner(agent=self.agent, app_name=self.app_name)
         self._session_created = False
     
@@ -212,5 +210,4 @@ def create_orchestrator_agent(
         return create_root_agent(model)
 
 
-# Default agent for ADK CLI - uses the full multi-agent system
 root_agent = create_orchestrator_agent(mode="full")

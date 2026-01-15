@@ -31,7 +31,6 @@ def list_tools_for_planning(category: Optional[str] = None) -> Dict[str, Any]:
     
     tools = registry.list_tools(category=category)
     
-    # Organize by category for easier planning
     by_category: Dict[str, List[Dict]] = {}
     
     for tool in tools:
@@ -116,7 +115,6 @@ def create_pipeline_plan(
             }
         ]
     """
-    # Format the plan for display
     formatted_steps = []
     for i, step in enumerate(steps, 1):
         formatted_step = {
@@ -178,7 +176,6 @@ def analyze_image_for_planning(image_path: str) -> Dict[str, Any]:
         img = Image.open(path)
         arr = np.array(img)
         
-        # Basic image analysis
         analysis = {
             "success": True,
             "image_path": str(path.absolute()),
@@ -192,7 +189,6 @@ def analyze_image_for_planning(image_path: str) -> Dict[str, Any]:
             "format": img.format,
         }
         
-        # Intensity statistics
         if arr.ndim == 2:  # Grayscale
             analysis["intensity"] = {
                 "min": int(arr.min()),
@@ -210,7 +206,6 @@ def analyze_image_for_planning(image_path: str) -> Dict[str, Any]:
                     "mean": float(arr.mean()),
                 }
         
-        # Quality indicators
         if "intensity" in analysis:
             intensity = analysis["intensity"]
             dynamic_range = intensity["max"] - intensity["min"]
@@ -260,11 +255,9 @@ def get_tool_compatibility(from_tool_id: str, to_tool_id: str) -> Dict[str, Any]
     if not to_schema:
         return {"error": f"Tool not found: {to_tool_id}"}
     
-    # Find compatible output->input pairs
     compatible = []
     for output in from_schema.outputs:
         for inp in to_schema.inputs:
-            # Check type compatibility
             if output.type == inp.type:
                 compatible.append({
                     "from_output": output.name,
@@ -272,7 +265,6 @@ def get_tool_compatibility(from_tool_id: str, to_tool_id: str) -> Dict[str, Any]
                     "type": output.type.value,
                     "required": inp.required,
                 })
-            # Check for compatible types (e.g., image -> path)
             elif output.type.value in ["image", "mask", "path"] and inp.type.value in ["image", "mask", "path"]:
                 compatible.append({
                     "from_output": output.name,
