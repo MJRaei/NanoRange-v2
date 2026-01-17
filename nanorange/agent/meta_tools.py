@@ -6,6 +6,7 @@ These tools are used by the orchestrator agent to:
 - Build and modify pipelines
 - Execute and validate pipelines
 - Save and load pipeline templates
+- Execute with iterative refinement
 """
 
 from typing import Any, Dict, List, Optional
@@ -14,11 +15,15 @@ from nanorange.core.registry import get_registry
 from nanorange.core.pipeline import PipelineManager
 from nanorange.core.executor import PipelineExecutor
 from nanorange.storage.session_manager import SessionManager
+from nanorange.agent.refinement import AdaptiveExecutor
+from nanorange.core.refinement_schemas import RefinementReport
 
 
 _current_manager: Optional[PipelineManager] = None
 _current_session: Optional[SessionManager] = None
 _current_executor: Optional[PipelineExecutor] = None
+_current_adaptive_executor: Optional[AdaptiveExecutor] = None
+_last_refinement_report: Optional[RefinementReport] = None
 
 
 def _get_manager() -> PipelineManager:
@@ -44,6 +49,14 @@ def _get_executor() -> PipelineExecutor:
     if _current_executor is None:
         _current_executor = PipelineExecutor()
     return _current_executor
+
+
+def _get_adaptive_executor() -> AdaptiveExecutor:
+    """Get or create the adaptive executor with refinement support."""
+    global _current_adaptive_executor
+    if _current_adaptive_executor is None:
+        _current_adaptive_executor = AdaptiveExecutor()
+    return _current_adaptive_executor
 
 
 def initialize_session(session_id: Optional[str] = None) -> str:
@@ -404,6 +417,202 @@ def execute_pipeline(
         "total_duration_seconds": result.total_duration_seconds,
         "step_results": step_summaries,
     }
+
+
+def execute_pipeline_adaptive(
+    user_inputs: Optional[Dict[str, Dict[str, Any]]] = None,
+    stop_on_error: bool = True,
+    context_description: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Execute the current pipeline with iterative refinement.
+    
+    This advanced execution mode:
+    - Reviews image outputs after each step using a vision model
+    - Adjusts parameters automatically to improve results
+    - Removes tools that don't work for the specific image
+    - Provides detailed reports of all changes made
+    
+    Note: Only parameters NOT explicitly specified by the user will be adjusted.
+    User-provided values are treated as locked and won't be modified.
+    
+    Args:
+        user_inputs: Pre-provided values for user-input parameters
+                    Format: {step_id: {param_name: value}}
+        stop_on_error: Whether to stop execution on first error
+        context_description: Description of what the pipeline should achieve,
+                           helps the reviewer make better decisions
+        
+    Returns:
+        Execution result with step outputs and refinement report
+    """
+    global _last_refinement_report
+    
+    manager = _get_manager()
+    adaptive_executor = _get_adaptive_executor()
+    
+    if not manager.current_pipeline:
+        return {"status": "error", "message": "No active pipeline"}
+    
+    validation = manager.validate()
+    if not validation.is_valid:
+        return {
+            "status": "validation_failed",
+            "errors": [str(e) for e in validation.errors],
+        }
+    
+    # Execute with refinement
+    result, refinement_report = adaptive_executor.execute(
+        manager.current_pipeline,
+        user_inputs=user_inputs,
+        stop_on_error=stop_on_error,
+        context_description=context_description
+    )
+    
+    # Store for later retrieval
+    _last_refinement_report = refinement_report
+    
+    # Save results
+    session = _get_session()
+    session.save_pipeline(manager.current_pipeline)
+    session.save_result(result)
+    
+    # Build step summaries
+    step_summaries = []
+    for sr in result.step_results:
+        step_summaries.append({
+            "step_name": sr.step_name,
+            "tool_id": sr.tool_id,
+            "status": sr.status.value,
+            "duration_seconds": sr.duration_seconds,
+            "outputs": sr.outputs,
+            "error": sr.error_message,
+        })
+    
+    # Get refinement summary
+    refinement_summary = refinement_report.get_summary()
+    
+    return {
+        "status": result.status.value,
+        "pipeline_name": result.pipeline_name,
+        "total_steps": result.total_steps,
+        "completed_steps": result.completed_steps,
+        "failed_steps": result.failed_steps,
+        "total_duration_seconds": result.total_duration_seconds,
+        "step_results": step_summaries,
+        "refinement": {
+            "enabled": True,
+            "total_iterations": refinement_summary["total_iterations"],
+            "steps_refined": refinement_summary["steps_refined"],
+            "tools_removed": refinement_summary["tools_removed"],
+            "tools_added": refinement_summary["tools_added"],
+            "changes": refinement_summary["step_changes"],
+            "pipeline_modifications": refinement_summary["pipeline_modifications"],
+        }
+    }
+
+
+def get_refinement_report() -> Dict[str, Any]:
+    """
+    Get the detailed refinement report from the last adaptive execution.
+    
+    Returns detailed information about:
+    - All parameter changes made and why
+    - Tools that were removed and the reasons
+    - Tools that were added
+    - Iteration history for each step
+    
+    Returns:
+        Detailed refinement report or error if no report available
+    """
+    global _last_refinement_report
+    
+    if _last_refinement_report is None:
+        return {
+            "status": "error",
+            "message": "No refinement report available. Run execute_pipeline_adaptive first."
+        }
+    
+    return {
+        "status": "success",
+        "report": _last_refinement_report.get_summary(),
+        "detailed_changes": _get_detailed_refinement_changes()
+    }
+
+
+def _get_detailed_refinement_changes() -> Dict[str, Any]:
+    """Get detailed changes from the last refinement report."""
+    global _last_refinement_report
+    
+    if _last_refinement_report is None:
+        return {}
+    
+    changes = {
+        "step_histories": {},
+        "removed_tools": [],
+        "parameter_adjustments": []
+    }
+    
+    for step_id, history in _last_refinement_report.step_histories.items():
+        step_info = {
+            "step_name": history.step_name,
+            "tool_id": history.tool_id,
+            "total_iterations": history.total_iterations,
+            "final_iteration": history.final_iteration,
+            "was_removed": history.was_removed,
+            "removal_reason": history.removal_reason,
+            "locked_parameters": history.user_locked_params,
+            "iteration_details": []
+        }
+        
+        for iteration in history.iterations:
+            iter_detail = {
+                "iteration": iteration.iteration,
+                "inputs": iteration.inputs_used,
+                "duration_seconds": iteration.duration_seconds,
+            }
+            
+            if iteration.decision:
+                iter_detail["decision"] = {
+                    "quality": iteration.decision.quality_score.value,
+                    "action": iteration.decision.action.value,
+                    "assessment": iteration.decision.assessment,
+                    "reasoning": iteration.decision.reasoning,
+                }
+                
+                if iteration.decision.parameter_changes:
+                    iter_detail["parameter_changes"] = [
+                        {
+                            "param": c.parameter_name,
+                            "from": c.old_value,
+                            "to": c.new_value,
+                            "reason": c.reason
+                        }
+                        for c in iteration.decision.parameter_changes
+                    ]
+                    
+                    # Also add to flat list
+                    for c in iteration.decision.parameter_changes:
+                        changes["parameter_adjustments"].append({
+                            "step": history.step_name,
+                            "param": c.parameter_name,
+                            "from": c.old_value,
+                            "to": c.new_value,
+                            "reason": c.reason
+                        })
+            
+            step_info["iteration_details"].append(iter_detail)
+        
+        changes["step_histories"][step_id] = step_info
+        
+        if history.was_removed:
+            changes["removed_tools"].append({
+                "step": history.step_name,
+                "tool": history.tool_id,
+                "reason": history.removal_reason
+            })
+    
+    return changes
 
 
 def get_results(step_name: Optional[str] = None) -> Dict[str, Any]:

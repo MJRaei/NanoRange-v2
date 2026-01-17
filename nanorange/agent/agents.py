@@ -34,8 +34,10 @@ from nanorange.agent.meta_tools import (
     # Validation & execution
     validate_pipeline,
     execute_pipeline,
+    execute_pipeline_adaptive,
     get_results,
     get_pipeline_summary,
+    get_refinement_report,
     # Persistence
     save_pipeline,
     load_pipeline,
@@ -84,7 +86,8 @@ def create_executor_agent(model: str = "gemini-2.0-flash") -> Agent:
     Create the Pipeline Executor Agent.
     
     The executor builds and runs approved pipelines using
-    all available analysis tools.
+    all available analysis tools. Supports iterative refinement
+    to optimize tool parameters automatically.
     
     Args:
         model: Gemini model to use
@@ -98,7 +101,8 @@ def create_executor_agent(model: str = "gemini-2.0-flash") -> Agent:
         description=(
             "Expert at building and executing image analysis pipelines. "
             "Takes approved plans from the Planner and executes them, "
-            "handling errors and reporting results."
+            "handling errors and reporting results. Can use adaptive execution "
+            "to automatically refine parameters and improve results."
         ),
         instruction=get_executor_prompt(),
         tools=[
@@ -112,8 +116,10 @@ def create_executor_agent(model: str = "gemini-2.0-flash") -> Agent:
             # Validation & execution
             validate_pipeline,
             execute_pipeline,
+            execute_pipeline_adaptive,
             get_results,
             get_pipeline_summary,
+            get_refinement_report,
             # Persistence
             save_pipeline,
             load_pipeline,

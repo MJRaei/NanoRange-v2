@@ -66,9 +66,11 @@ You can ONLY use these EXACT tool IDs and parameter names. Do NOT invent or gues
 ## Pipeline Management Tools
 
 - `validate_pipeline()` - Check for errors
-- `execute_pipeline(user_inputs)` - Run the pipeline
+- `execute_pipeline(user_inputs)` - Run the pipeline (standard mode)
+- `execute_pipeline_adaptive(user_inputs, context_description)` - Run with iterative refinement
 - `get_results(step_name)` - Get step results
 - `get_pipeline_summary()` - View current pipeline
+- `get_refinement_report()` - Get details about parameter adjustments made
 
 ## Persistence Tools
 
@@ -193,12 +195,68 @@ You would:
 Be concise but informative. Report progress as you build and execute. Show results clearly with file paths users can access.
 """
 
+ADAPTIVE_EXECUTION_PROMPT = """## Adaptive Execution with Iterative Refinement
+
+NanoRange supports intelligent pipeline execution that automatically improves results.
+
+### When to Use Adaptive Execution
+
+Use `execute_pipeline_adaptive()` instead of `execute_pipeline()` when:
+- The user hasn't provided specific parameter values
+- Results might need optimization for the specific image
+- You want automatic quality improvement
+
+### How Adaptive Execution Works
+
+1. **Runs each step** and produces outputs
+2. **Reviews image outputs** using a vision model
+3. **Decides if improvement is possible**:
+   - ACCEPT: Output is good, continue to next step
+   - ADJUST: Change parameters and re-run (up to MAX_TOOL_ITERATIONS times)
+   - REMOVE: Tool isn't suitable for this image, remove from pipeline
+4. **Reports all changes** made during execution
+
+### Important Rules
+
+- **User-specified values are LOCKED**: If the user provides a specific number (like threshold_value=128), it will NOT be changed
+- **Only flexible parameters are adjusted**: Default values and unspecified parameters can be optimized
+- **Max iterations**: Each tool can be re-run up to MAX_TOOL_ITERATIONS times (default: 3)
+- **Detailed reporting**: Use `get_refinement_report()` to see all changes made
+
+### Example Usage
+
+```python
+# Standard execution (no refinement)
+execute_pipeline(user_inputs={...})
+
+# Adaptive execution with refinement
+execute_pipeline_adaptive(
+    user_inputs={...},
+    context_description="Segment cells in a fluorescence microscopy image"
+)
+
+# Then check what changes were made
+get_refinement_report()
+```
+
+### Presenting Refinement Results
+
+When using adaptive execution, report to the user:
+1. How many steps were refined
+2. Which parameters were adjusted and why
+3. Any tools that were removed (and why they didn't work)
+4. The final optimized parameter values
+
+This helps users understand what the system learned about their specific image.
+"""
+
 
 def get_executor_prompt() -> str:
     """Get the complete system prompt for the executor agent."""
     return "\n\n---\n\n".join([
         EXECUTOR_SYSTEM_PROMPT,
         PIPELINE_BUILDING_PROMPT,
+        ADAPTIVE_EXECUTION_PROMPT,
         ERROR_HANDLING_PROMPT,
         RESULT_EXPLANATION_PROMPT,
         EXAMPLE_EXECUTION_PROMPT,
