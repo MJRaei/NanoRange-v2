@@ -33,6 +33,7 @@ from nanorange.core.validator import PipelineValidator
 from nanorange.agent.refinement.image_reviewer import ImageReviewer
 from nanorange.agent.refinement.parameter_optimizer import ParameterOptimizer
 from nanorange.agent.refinement.refinement_tracker import RefinementTracker
+from nanorange.agent.refinement.artifact_manager import ArtifactManager
 from nanorange import settings
 
 
@@ -46,10 +47,8 @@ class AdaptiveExecutionContext:
         self.started_at: Optional[datetime] = None
         self.completed_at: Optional[datetime] = None
         
-        # Track removed steps
         self.removed_steps: List[str] = []
         
-        # Track the input image for the pipeline (for comparison)
         self.input_image_path: Optional[str] = None
     
     def get_output(self, step_id: str, output_name: str) -> Any:
@@ -90,7 +89,8 @@ class AdaptiveExecutor:
         optimizer: Optional[ParameterOptimizer] = None,
         user_input_handler: Optional[Callable[[str, str], Any]] = None,
         refinement_enabled: Optional[bool] = None,
-        max_iterations: Optional[int] = None
+        max_iterations: Optional[int] = None,
+        save_iteration_artifacts: bool = True
     ):
         """
         Initialize the adaptive executor.
@@ -103,6 +103,7 @@ class AdaptiveExecutor:
             user_input_handler: Function to get user input
             refinement_enabled: Whether to enable refinement (defaults to settings)
             max_iterations: Max iterations per tool (defaults to settings)
+            save_iteration_artifacts: Whether to save outputs from each iteration
         """
         self.registry = registry or get_registry()
         self.validator = validator or PipelineValidator(self.registry)
@@ -115,6 +116,7 @@ class AdaptiveExecutor:
             else settings.REFINEMENT_ENABLED
         )
         self.max_iterations = max_iterations or settings.MAX_TOOL_ITERATIONS
+        self.save_iteration_artifacts = save_iteration_artifacts
     
     def execute(
         self,
@@ -135,11 +137,20 @@ class AdaptiveExecutor:
         Returns:
             Tuple of (PipelineResult, RefinementReport)
         """
-        # Initialize tracking
-        tracker = RefinementTracker(pipeline.pipeline_id, pipeline.name)
+        artifact_manager = None
+        if self.save_iteration_artifacts:
+            artifact_manager = ArtifactManager(
+                pipeline_id=pipeline.pipeline_id,
+                pipeline_name=pipeline.name
+            )
+        
+        tracker = RefinementTracker(
+            pipeline_id=pipeline.pipeline_id,
+            pipeline_name=pipeline.name,
+            artifact_manager=artifact_manager
+        )
         tracker.start_execution()
         
-        # Initialize result
         result = PipelineResult(
             pipeline_id=pipeline.pipeline_id,
             pipeline_name=pipeline.name,
@@ -148,7 +159,6 @@ class AdaptiveExecutor:
         )
         result.started_at = datetime.utcnow()
         
-        # Validate pipeline
         validation = self.validator.validate(pipeline)
         if not validation.is_valid:
             result.status = StepStatus.FAILED
@@ -163,11 +173,9 @@ class AdaptiveExecutor:
             tracker.end_execution()
             return result, tracker.get_report()
         
-        # Create execution context
         context = AdaptiveExecutionContext(pipeline)
         context.started_at = datetime.utcnow()
         
-        # Get execution order
         try:
             execution_order = self.validator.get_execution_order(pipeline)
         except ValueError as e:
@@ -182,11 +190,9 @@ class AdaptiveExecutor:
             tracker.end_execution()
             return result, tracker.get_report()
         
-        # Execute steps
         result.status = StepStatus.RUNNING
         
         for step_id in execution_order:
-            # Skip removed steps
             if step_id in context.removed_steps:
                 continue
             
@@ -194,7 +200,6 @@ class AdaptiveExecutor:
             if not step:
                 continue
             
-            # Execute with refinement
             step_result, was_removed = self._execute_step_with_refinement(
                 step=step,
                 context=context,
@@ -204,7 +209,6 @@ class AdaptiveExecutor:
             )
             
             if was_removed:
-                # Step was removed, skip to next
                 context.mark_step_removed(step_id)
                 continue
             
@@ -219,7 +223,6 @@ class AdaptiveExecutor:
                 if stop_on_error:
                     break
         
-        # Finalize
         result.completed_at = datetime.utcnow()
         result.total_duration_seconds = (
             result.completed_at - result.started_at
@@ -251,15 +254,12 @@ class AdaptiveExecutor:
         """
         tool_schema = self.registry.get_schema(step.tool_id)
         
-        # Resolve initial inputs
         resolved_inputs = self._resolve_inputs(step, context, user_inputs)
         
-        # Identify user-locked parameters
         user_locked_params = self.optimizer.identify_locked_params(
             resolved_inputs, tool_schema
         ) if tool_schema else []
         
-        # Start tracking this step
         tracker.start_step(
             step_id=step.step_id,
             step_name=step.step_name,
@@ -267,7 +267,6 @@ class AdaptiveExecutor:
             user_locked_params=user_locked_params
         )
         
-        # Track input image for the pipeline
         if context.input_image_path is None:
             for input_name, value in resolved_inputs.items():
                 if isinstance(value, str) and any(
@@ -277,14 +276,12 @@ class AdaptiveExecutor:
                     context.input_image_path = value
                     break
         
-        # Refinement loop
         iteration = 1
         current_inputs = resolved_inputs.copy()
         final_result = None
         was_removed = False
         
         while iteration <= self.max_iterations:
-            # Execute the step
             start_time = datetime.utcnow()
             step_result = self._execute_single_iteration(
                 step=step,
@@ -292,7 +289,6 @@ class AdaptiveExecutor:
             )
             duration = (datetime.utcnow() - start_time).total_seconds()
             
-            # Check if step failed
             if step_result.status == StepStatus.FAILED:
                 tracker.record_iteration(
                     iteration=iteration,
@@ -304,15 +300,16 @@ class AdaptiveExecutor:
                 tracker.finalize_step(was_removed=False)
                 return step_result, False
             
-            # Check if refinement is enabled and output is an image
+            is_io_tool = tool_schema and tool_schema.category == "io"
+            
             should_review = (
                 self.refinement_enabled and
                 tool_schema and
+                not is_io_tool and
                 self._has_image_output(step_result.outputs, tool_schema)
             )
             
             if not should_review:
-                # No review needed, accept result
                 tracker.record_iteration(
                     iteration=iteration,
                     inputs_used=current_inputs,
@@ -322,13 +319,11 @@ class AdaptiveExecutor:
                 tracker.finalize_step(accepted_iteration=iteration)
                 return step_result, False
             
-            # Get output image path for review
             output_image_path = self._get_image_output_path(
                 step_result.outputs, tool_schema
             )
             
             if not output_image_path:
-                # No image to review
                 tracker.record_iteration(
                     iteration=iteration,
                     inputs_used=current_inputs,
@@ -338,7 +333,16 @@ class AdaptiveExecutor:
                 tracker.finalize_step(accepted_iteration=iteration)
                 return step_result, False
             
-            # Review the output
+            if output_image_path == context.input_image_path:
+                tracker.record_iteration(
+                    iteration=iteration,
+                    inputs_used=current_inputs,
+                    outputs=step_result.outputs,
+                    duration_seconds=duration
+                )
+                tracker.finalize_step(accepted_iteration=iteration)
+                return step_result, False
+            
             decision = self.reviewer.review_output(
                 step_id=step.step_id,
                 tool_schema=tool_schema,
@@ -350,7 +354,6 @@ class AdaptiveExecutor:
                 context=context_description
             )
             
-            # Record this iteration
             tracker.record_iteration(
                 iteration=iteration,
                 inputs_used=current_inputs,
@@ -359,7 +362,6 @@ class AdaptiveExecutor:
                 duration_seconds=duration
             )
             
-            # Act on the decision
             if decision.action == RefinementAction.ACCEPT:
                 tracker.finalize_step(accepted_iteration=iteration)
                 final_result = step_result
@@ -380,7 +382,6 @@ class AdaptiveExecutor:
             
             elif decision.action == RefinementAction.ADJUST_PARAMS:
                 if iteration < self.max_iterations:
-                    # Apply parameter changes
                     current_inputs, _ = self.optimizer.apply_changes(
                         current_inputs,
                         decision,
@@ -389,7 +390,6 @@ class AdaptiveExecutor:
                     )
                     iteration += 1
                 else:
-                    # Max iterations reached, accept current result
                     tracker.finalize_step(accepted_iteration=iteration)
                     final_result = step_result
                     break
@@ -421,7 +421,6 @@ class AdaptiveExecutor:
         result.started_at = datetime.utcnow()
         
         try:
-            # Get tool implementation
             implementation = self.registry.get_implementation(step.tool_id)
             if not implementation:
                 tool_class = self.registry.get_tool_class(step.tool_id)
@@ -432,7 +431,6 @@ class AdaptiveExecutor:
                         f"No implementation found for tool: {step.tool_id}"
                     )
             
-            # Execute tool
             outputs = implementation(**inputs)
             
             if not isinstance(outputs, dict):
@@ -464,24 +462,19 @@ class AdaptiveExecutor:
         """Resolve all inputs for a step."""
         resolved = {}
         
-        # Get tool schema for defaults
         schema = self.registry.get_schema(step.tool_id)
         
-        # Apply defaults from schema
         if schema:
             for inp in schema.inputs:
                 if not inp.required and inp.default is not None:
                     resolved[inp.name] = inp.default
         
-        # Resolve explicit inputs
         for input_name, step_input in step.inputs.items():
             if step_input.source == InputSource.STATIC:
                 resolved[input_name] = step_input.value
             
             elif step_input.source == InputSource.STEP_OUTPUT:
-                # Skip if source step was removed
                 if step_input.source_step_id in context.removed_steps:
-                    # Try to get from an earlier step
                     continue
                 resolved[input_name] = context.get_output(
                     step_input.source_step_id,

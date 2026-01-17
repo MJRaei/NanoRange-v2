@@ -38,6 +38,7 @@ from nanorange.agent.meta_tools import (
     get_results,
     get_pipeline_summary,
     get_refinement_report,
+    get_iteration_artifacts,
     # Persistence
     save_pipeline,
     load_pipeline,
@@ -120,6 +121,7 @@ def create_executor_agent(model: str = "gemini-2.0-flash") -> Agent:
             get_results,
             get_pipeline_summary,
             get_refinement_report,
+            get_iteration_artifacts,
             # Persistence
             save_pipeline,
             load_pipeline,

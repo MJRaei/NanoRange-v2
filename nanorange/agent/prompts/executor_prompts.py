@@ -71,6 +71,7 @@ You can ONLY use these EXACT tool IDs and parameter names. Do NOT invent or gues
 - `get_results(step_name)` - Get step results
 - `get_pipeline_summary()` - View current pipeline
 - `get_refinement_report()` - Get details about parameter adjustments made
+- `get_iteration_artifacts(step_name)` - Get paths to images from each iteration
 
 ## Persistence Tools
 
@@ -209,12 +210,14 @@ Use `execute_pipeline_adaptive()` instead of `execute_pipeline()` when:
 ### How Adaptive Execution Works
 
 1. **Runs each step** and produces outputs
-2. **Reviews image outputs** using a vision model
-3. **Decides if improvement is possible**:
+2. **Saves outputs from each iteration** (images are stored for comparison)
+3. **Reviews image outputs** using a vision model
+4. **Decides if improvement is possible**:
    - ACCEPT: Output is good, continue to next step
    - ADJUST: Change parameters and re-run (up to MAX_TOOL_ITERATIONS times)
    - REMOVE: Tool isn't suitable for this image, remove from pipeline
-4. **Reports all changes** made during execution
+5. **Reports all changes** made during execution
+6. **Provides access to all iteration images** via `get_iteration_artifacts()`
 
 ### Important Rules
 
@@ -237,7 +240,20 @@ execute_pipeline_adaptive(
 
 # Then check what changes were made
 get_refinement_report()
+
+# Get paths to images from each iteration (for comparison)
+get_iteration_artifacts()  # All steps
+get_iteration_artifacts("Threshold")  # Specific step only
 ```
+
+### Iteration Artifacts
+
+When adaptive execution runs, it saves the output image from EACH iteration:
+- Located in: `data/files/refinement/<pipeline_id>/<step_name>/iteration_<n>/`
+- Final accepted outputs also copied to: `<step_name>/final/`
+- Use `get_iteration_artifacts()` to get all paths
+
+This allows users to compare what the tool produced at each iteration and understand how parameter changes affected the results.
 
 ### Presenting Refinement Results
 

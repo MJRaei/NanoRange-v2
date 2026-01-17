@@ -550,7 +550,8 @@ def _get_detailed_refinement_changes() -> Dict[str, Any]:
     changes = {
         "step_histories": {},
         "removed_tools": [],
-        "parameter_adjustments": []
+        "parameter_adjustments": [],
+        "iteration_artifacts": {}
     }
     
     for step_id, history in _last_refinement_report.step_histories.items():
@@ -565,12 +566,18 @@ def _get_detailed_refinement_changes() -> Dict[str, Any]:
             "iteration_details": []
         }
         
+        step_artifacts = {}
+        
         for iteration in history.iterations:
             iter_detail = {
                 "iteration": iteration.iteration,
                 "inputs": iteration.inputs_used,
                 "duration_seconds": iteration.duration_seconds,
             }
+            
+            if "_iteration_artifacts" in iteration.outputs:
+                iter_detail["artifacts"] = iteration.outputs["_iteration_artifacts"]
+                step_artifacts[iteration.iteration] = iteration.outputs["_iteration_artifacts"]
             
             if iteration.decision:
                 iter_detail["decision"] = {
@@ -591,7 +598,6 @@ def _get_detailed_refinement_changes() -> Dict[str, Any]:
                         for c in iteration.decision.parameter_changes
                     ]
                     
-                    # Also add to flat list
                     for c in iteration.decision.parameter_changes:
                         changes["parameter_adjustments"].append({
                             "step": history.step_name,
@@ -605,6 +611,13 @@ def _get_detailed_refinement_changes() -> Dict[str, Any]:
         
         changes["step_histories"][step_id] = step_info
         
+        if step_artifacts:
+            changes["iteration_artifacts"][history.step_name] = {
+                "step_id": step_id,
+                "iterations": step_artifacts,
+                "final_iteration": history.final_iteration
+            }
+        
         if history.was_removed:
             changes["removed_tools"].append({
                 "step": history.step_name,
@@ -613,6 +626,70 @@ def _get_detailed_refinement_changes() -> Dict[str, Any]:
             })
     
     return changes
+
+
+def get_iteration_artifacts(step_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get paths to all iteration images/artifacts from the last adaptive execution.
+    
+    This allows you to see the output from each iteration of each step,
+    not just the final result. Useful for understanding how the refinement
+    process worked and comparing different parameter settings.
+    
+    Args:
+        step_name: Optional step name to filter by
+        
+    Returns:
+        Dictionary with iteration artifact paths organized by step
+    """
+    global _last_refinement_report
+    
+    if _last_refinement_report is None:
+        return {
+            "status": "error",
+            "message": "No refinement report available. Run execute_pipeline_adaptive first."
+        }
+    
+    artifacts = {
+        "status": "success",
+        "steps": {}
+    }
+    
+    for step_id, history in _last_refinement_report.step_histories.items():
+        if step_name and history.step_name != step_name:
+            continue
+        
+        step_info = {
+            "step_name": history.step_name,
+            "tool": history.tool_id,
+            "total_iterations": history.total_iterations,
+            "final_iteration": history.final_iteration,
+            "iterations": {}
+        }
+        
+        for iteration in history.iterations:
+            iter_artifacts = {}
+            
+            if "_iteration_artifacts" in iteration.outputs:
+                iter_artifacts = iteration.outputs["_iteration_artifacts"]
+            
+            for key, value in iteration.outputs.items():
+                if key != "_iteration_artifacts" and isinstance(value, str):
+                    if any(value.lower().endswith(ext) for ext in 
+                           ['.png', '.jpg', '.jpeg', '.tif', '.tiff']):
+                        iter_artifacts[f"original_{key}"] = value
+            
+            if iter_artifacts:
+                step_info["iterations"][iteration.iteration] = {
+                    "artifacts": iter_artifacts,
+                    "inputs_used": iteration.inputs_used,
+                    "is_final": iteration.iteration == history.final_iteration
+                }
+        
+        if step_info["iterations"]:
+            artifacts["steps"][history.step_name] = step_info
+    
+    return artifacts
 
 
 def get_results(step_name: Optional[str] = None) -> Dict[str, Any]:

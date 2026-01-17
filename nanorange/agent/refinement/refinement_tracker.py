@@ -6,10 +6,11 @@ Maintains a detailed history of:
 - Parameter changes made
 - Pipeline modifications (tools added/removed)
 - Final outcomes
+- Artifact paths for each iteration
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from nanorange.core.refinement_schemas import (
     RefinementReport,
@@ -20,6 +21,9 @@ from nanorange.core.refinement_schemas import (
     ParameterChange,
 )
 
+if TYPE_CHECKING:
+    from nanorange.agent.refinement.artifact_manager import ArtifactManager
+
 
 class RefinementTracker:
     """
@@ -29,21 +33,31 @@ class RefinementTracker:
     - Real-time tracking of iterations and changes
     - Generation of detailed reports
     - Human-readable summaries
+    - Artifact paths for each iteration's outputs
     """
     
-    def __init__(self, pipeline_id: str, pipeline_name: str):
+    def __init__(
+        self,
+        pipeline_id: str,
+        pipeline_name: str,
+        artifact_manager: Optional["ArtifactManager"] = None
+    ):
         """
         Initialize the tracker.
         
         Args:
             pipeline_id: Pipeline being executed
             pipeline_name: Human-readable pipeline name
+            artifact_manager: Optional manager for saving iteration artifacts
         """
         self.report = RefinementReport(
             pipeline_id=pipeline_id,
             pipeline_name=pipeline_name
         )
         self._current_step_history: Optional[StepRefinementHistory] = None
+        self._artifact_manager = artifact_manager
+        self._current_step_id: Optional[str] = None
+        self._current_step_name: Optional[str] = None
     
     def start_execution(self) -> None:
         """Mark the start of pipeline execution."""
@@ -79,6 +93,8 @@ class RefinementTracker:
             tool_id=tool_id,
             user_locked_params=user_locked_params
         )
+        self._current_step_id = step_id
+        self._current_step_name = step_name
         self.report.total_steps_executed += 1
     
     def record_iteration(
@@ -89,7 +105,7 @@ class RefinementTracker:
         decision: Optional[RefinementDecision] = None,
         duration_seconds: Optional[float] = None,
         error: Optional[str] = None
-    ) -> None:
+    ) -> Dict[str, str]:
         """
         Record an iteration of step execution.
         
@@ -100,14 +116,52 @@ class RefinementTracker:
             decision: Refinement decision if reviewed
             duration_seconds: Execution time
             error: Error message if failed
+            
+        Returns:
+            Dictionary of saved artifact paths (empty if no artifacts saved)
         """
+        saved_artifacts = {}
+        
         if not self._current_step_history:
-            return
+            return saved_artifacts
+        
+        if self._artifact_manager and outputs and self._current_step_id:
+            saved_artifacts = self._artifact_manager.save_iteration_outputs(
+                step_id=self._current_step_id,
+                step_name=self._current_step_name or self._current_step_id,
+                iteration=iteration,
+                outputs=outputs
+            )
+            
+            metadata = {
+                "iteration": iteration,
+                "inputs": inputs_used,
+                "outputs": outputs,
+                "duration_seconds": duration_seconds,
+                "error": error,
+            }
+            if decision:
+                metadata["decision"] = {
+                    "quality": decision.quality_score.value,
+                    "action": decision.action.value,
+                    "assessment": decision.assessment,
+                    "reasoning": decision.reasoning,
+                }
+            self._artifact_manager.save_metadata(
+                step_id=self._current_step_id,
+                step_name=self._current_step_name or self._current_step_id,
+                iteration=iteration,
+                metadata=metadata
+            )
+        
+        outputs_with_artifacts = outputs.copy() if outputs else {}
+        if saved_artifacts:
+            outputs_with_artifacts["_iteration_artifacts"] = saved_artifacts
         
         step_iter = StepIteration(
             iteration=iteration,
             inputs_used=inputs_used.copy(),
-            outputs=outputs.copy() if outputs else {},
+            outputs=outputs_with_artifacts,
             decision=decision,
             duration_seconds=duration_seconds,
             error=error
@@ -115,6 +169,8 @@ class RefinementTracker:
         
         self._current_step_history.iterations.append(step_iter)
         self.report.total_iterations += 1
+        
+        return saved_artifacts
     
     def finalize_step(
         self,
@@ -137,8 +193,19 @@ class RefinementTracker:
         self._current_step_history.was_removed = was_removed
         self._current_step_history.removal_reason = removal_reason
         
+        if (self._artifact_manager and 
+            accepted_iteration is not None and 
+            self._current_step_id):
+            self._artifact_manager.mark_final(
+                step_id=self._current_step_id,
+                step_name=self._current_step_name or self._current_step_id,
+                final_iteration=accepted_iteration
+            )
+        
         self.report.add_step_history(self._current_step_history)
         self._current_step_history = None
+        self._current_step_id = None
+        self._current_step_name = None
     
     def record_tool_removal(
         self,
@@ -300,7 +367,8 @@ class RefinementTracker:
                 "tools_added": self.report.tools_added,
             },
             "step_details": [],
-            "pipeline_changes": []
+            "pipeline_changes": [],
+            "artifacts": self.get_artifact_summary() if self._artifact_manager else None
         }
         
         for step_id, history in self.report.step_histories.items():
@@ -310,7 +378,8 @@ class RefinementTracker:
                 "iterations": history.total_iterations,
                 "was_removed": history.was_removed,
                 "removal_reason": history.removal_reason,
-                "parameter_adjustments": []
+                "parameter_adjustments": [],
+                "iteration_artifacts": []
             }
             
             for iteration in history.iterations:
@@ -322,6 +391,12 @@ class RefinementTracker:
                             "to_value": change.new_value,
                             "reason": change.reason
                         })
+                
+                if "_iteration_artifacts" in iteration.outputs:
+                    step_info["iteration_artifacts"].append({
+                        "iteration": iteration.iteration,
+                        "artifacts": iteration.outputs["_iteration_artifacts"]
+                    })
             
             if history.had_refinements or history.was_removed:
                 changes["step_details"].append(step_info)
@@ -335,3 +410,48 @@ class RefinementTracker:
             })
         
         return changes
+    
+    def get_artifact_summary(self) -> Optional[Dict[str, Any]]:
+        """
+        Get summary of all saved artifacts.
+        
+        Returns:
+            Artifact summary or None if no artifact manager
+        """
+        if not self._artifact_manager:
+            return None
+        
+        return self._artifact_manager.get_artifact_summary()
+    
+    def get_iteration_images(self, step_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get paths to all iteration images for easy access.
+        
+        Args:
+            step_name: Optional step name to filter by
+            
+        Returns:
+            Dictionary with iteration image paths organized by step
+        """
+        images = {}
+        
+        for step_id, history in self.report.step_histories.items():
+            if step_name and history.step_name != step_name:
+                continue
+            
+            step_images = {
+                "step_name": history.step_name,
+                "tool": history.tool_id,
+                "final_iteration": history.final_iteration,
+                "iterations": {}
+            }
+            
+            for iteration in history.iterations:
+                if "_iteration_artifacts" in iteration.outputs:
+                    step_images["iterations"][iteration.iteration] = \
+                        iteration.outputs["_iteration_artifacts"]
+            
+            if step_images["iterations"]:
+                images[step_id] = step_images
+        
+        return images
