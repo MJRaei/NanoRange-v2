@@ -141,7 +141,8 @@ THRESHOLD_SCHEMA = ToolSchema(
 def find_contours(
     mask_path: str,
     min_area: int = 10,
-    max_area: int = None
+    max_area: int = None,
+    output_path: str = None
 ) -> Dict[str, Any]:
     """
     Find contours/objects in a binary mask.
@@ -150,10 +151,12 @@ def find_contours(
         mask_path: Path to binary mask image
         min_area: Minimum object area in pixels
         max_area: Maximum object area (None for no limit)
+        output_path: Optional output path for JSON results file
         
     Returns:
-        Dictionary with object count and bounding boxes
+        Dictionary with object count, bounding boxes, and output file path
     """
+    import json
     from PIL import Image
     import numpy as np
     
@@ -161,27 +164,25 @@ def find_contours(
     if not source.exists():
         raise FileNotFoundError(f"Mask not found: {mask_path}")
     
-    # Load mask
+    if output_path is None:
+        output_path = str(source.parent / f"{source.stem}_contours.json")
+    
     img = Image.open(source).convert('L')
     mask = np.array(img) > 127
     
-    # Simple connected component analysis
     from scipy import ndimage
     labeled, num_features = ndimage.label(mask)
     
-    # Get object properties
     objects = []
     for i in range(1, num_features + 1):
         obj_mask = labeled == i
         area = np.sum(obj_mask)
         
-        # Filter by area
         if area < min_area:
             continue
         if max_area is not None and area > max_area:
             continue
         
-        # Get bounding box
         rows = np.any(obj_mask, axis=1)
         cols = np.any(obj_mask, axis=0)
         rmin, rmax = np.where(rows)[0][[0, -1]]
@@ -194,16 +195,30 @@ def find_contours(
             "centroid": [int((cmin + cmax) / 2), int((rmin + rmax) / 2)],
         })
     
+    results = {
+        "source_mask": str(source),
+        "object_count": len(objects),
+        "filter_settings": {
+            "min_area": min_area,
+            "max_area": max_area
+        },
+        "objects": objects,
+    }
+    
+    with open(output_path, 'w') as f:
+        json.dump(results, f, indent=2)
+    
     return {
         "object_count": len(objects),
         "objects": objects,
+        "output_file": output_path,
     }
 
 
 FIND_CONTOURS_SCHEMA = ToolSchema(
     tool_id="find_contours",
     name="Find Contours",
-    description="Find and count objects in a binary mask",
+    description="Find and count objects in a binary mask, saves results to JSON",
     type=ToolType.FUNCTION,
     category="segmentation",
     inputs=[
@@ -227,6 +242,12 @@ FIND_CONTOURS_SCHEMA = ToolSchema(
             description="Maximum object area (None for no limit)",
             required=False,
         ),
+        InputSchema(
+            name="output_path",
+            type=DataType.PATH,
+            description="Output path for JSON results file",
+            required=False,
+        ),
     ],
     outputs=[
         OutputSchema(
@@ -238,6 +259,11 @@ FIND_CONTOURS_SCHEMA = ToolSchema(
             name="objects",
             type=DataType.LIST,
             description="List of object properties",
+        ),
+        OutputSchema(
+            name="output_file",
+            type=DataType.PATH,
+            description="Path to saved JSON results file",
         ),
     ],
     tags=["contours", "objects", "detect", "count"],
