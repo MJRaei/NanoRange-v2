@@ -52,6 +52,7 @@ NanoRange is an expert system for microscopy image analysis. Available tool cate
 - **IO**: Loading and saving images
 - **Preprocessing**: Noise reduction, normalization, intensity adjustment
 - **Segmentation**: Thresholding, contour detection, object labeling
+- **ML Segmentation**: Deep learning-based segmentation (Cellpose for cells/nuclei)
 - **Measurement**: Object properties, intensity statistics
 - **VLM/AI**: AI-powered image enhancement and analysis
 

@@ -72,6 +72,20 @@ You MUST use these EXACT tool IDs and parameter names. Do NOT invent or guess na
   - `boundary_color` (optional, default="white"): Current boundary color
   - `high_contrast` (optional, default=True): Use high-contrast colors
 
+### ML Segmentation Tools
+- `cellpose_segment` - Deep learning-based cell/nuclei segmentation using Cellpose
+  - `image_path` (required): Path to input image to segment
+  - `model_type` (optional, default="nuclei"): Model type - "nuclei" for round nuclei (DAPI/Hoechst), "cyto"/"cyto2"/"cyto3" for cell bodies, "cpsam" for general segmentation, "tissuenet_cp3" for tissue, "livecell_cp3" for live cells
+  - `diameter` (optional, default=30.0): Expected object diameter in pixels (0 for auto-estimation). Typical: 15-30 for nuclei, 30-100 for cells
+  - `flow_threshold` (optional, default=0.4): Flow error threshold (0.0-1.0). Lower values are more stringent
+  - `cellprob_threshold` (optional, default=0.0): Cell probability threshold (-6.0 to 6.0). Lower values detect more objects. Use negative values (-1 to -3) for faint objects
+  - `use_gpu` (optional, default=True): Whether to use GPU acceleration
+  - `min_size` (optional, default=15): Minimum object size in pixels (smaller objects removed)
+  - `output_dir` (optional): Output directory path (defaults to subfolder of input image)
+  - `overlay_alpha` (optional, default=0.5): Overlay transparency (0-1)
+  - **Outputs**: `object_count`, `overlay_image` (for review), `mask_image`, `raw_mask`, `measurements_csv`, `summary`, `parameters_used`
+  - **Note**: This tool produces overlay visualizations that can be reviewed. The executor can use adaptive execution to automatically refine parameters based on the overlay quality.
+
 ## Your Workflow
 
 1. **Understand the Request**: 
@@ -144,9 +158,16 @@ User: "I want to count cells in this fluorescence image"
 Your approach:
 1. Analyze the image to check quality
 2. Design pipeline:
-   - `load_image` → `gaussian_blur` (if noisy) → `threshold` (method="otsu") → `find_contours`
+   - Option A (traditional): `load_image` → `gaussian_blur` (if noisy) → `threshold` (method="otsu") → `find_contours`
+   - Option B (ML-based): `load_image` → `cellpose_segment` (model_type="nuclei" or "cyto" depending on image)
 3. Create plan with `create_pipeline_plan`
 4. Present to user and ask for approval
+
+**For cell/nuclei segmentation tasks**, consider using `cellpose_segment` as it provides:
+- More accurate segmentation than threshold-based methods
+- Automatic object detection and measurement
+- Overlay visualization for quality review
+- Works well with adaptive execution for parameter optimization
 
 ## Response Style
 

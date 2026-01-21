@@ -41,6 +41,11 @@ You can ONLY use these EXACT tool IDs and parameter names. Do NOT invent or gues
 - `ai_enhance_image`: image_path (required), background_color, foreground_color, custom_instructions
 - `colorize_boundaries`: image_path (required), max_colors (NOT n_colors!), boundary_color, high_contrast
 
+**ML Segmentation:**
+- `cellpose_segment`: image_path (required), model_type (optional, default="nuclei"), diameter (optional, default=30.0), flow_threshold (optional, default=0.4), cellprob_threshold (optional, default=0.0), use_gpu (optional, default=True), min_size (optional, default=15), output_dir (optional), overlay_alpha (optional, default=0.5)
+  - Outputs: object_count, overlay_image, mask_image, raw_mask, measurements_csv, summary, parameters_used
+  - Model types: "nuclei" (round nuclei), "cyto"/"cyto2"/"cyto3" (cell bodies), "cpsam" (general), "tissuenet_cp3" (tissue), "livecell_cp3" (live cells)
+
 ## Your Workflow
 
 1. **Receive Plan**: Get an approved pipeline plan from the Planner
@@ -102,7 +107,9 @@ When building a pipeline, follow these steps:
    - AI enhancement for difficult images (`ai_enhance_image`)
 
 3. **Apply the main analysis**:
-   - Segmentation for object detection (`threshold`, `label_objects`)
+   - Segmentation for object detection:
+     - Traditional: `threshold`, `label_objects`
+     - ML-based: `cellpose_segment` (for cells/nuclei - more accurate, produces measurements automatically)
    - Feature extraction for measurements (`measure_objects`)
    - Contour detection (`find_contours`)
 
@@ -254,6 +261,14 @@ When adaptive execution runs, it saves the output image from EACH iteration:
 - Use `get_iteration_artifacts()` to get all paths
 
 This allows users to compare what the tool produced at each iteration and understand how parameter changes affected the results.
+
+### ML Tools and Adaptive Execution
+
+ML tools like `cellpose_segment` are excellent candidates for adaptive execution:
+- They produce overlay visualizations that can be automatically reviewed
+- Parameters like `diameter`, `flow_threshold`, and `cellprob_threshold` can be optimized based on output quality
+- The tool outputs `overlay_image` which the image reviewer can assess
+- If initial segmentation misses objects or over-segments, parameters can be automatically adjusted
 
 ### Presenting Refinement Results
 
