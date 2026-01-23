@@ -1,0 +1,57 @@
+"""
+NanOrange API Server
+
+Main FastAPI application for the NanOrange cryo-TEM analysis tool.
+"""
+
+import os
+import sys
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from api.routes import chat_router, files_router
+
+app = FastAPI(
+    title="NanOrange API",
+    description="API for AI-powered nanoparticle analysis from cryo-TEM images",
+    version="0.1.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+OUTPUT_DIR = "output"
+UPLOADS_DIR = "uploads"
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+app.mount("/static/output", StaticFiles(directory=OUTPUT_DIR), name="output")
+app.mount("/static/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+app.include_router(chat_router)
+app.include_router(files_router)
+
+
+@app.get("/")
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "name": "NanOrange API",
+        "version": "0.1.0",
+        "description": "AI-powered nanoparticle analysis from cryo-TEM images",
+        "docs": "/docs",
+        "health": "/api/chat/health"
+    }
+
