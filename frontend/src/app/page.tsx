@@ -15,6 +15,15 @@ import {
   checkHealth,
 } from "./components";
 
+// UUID generator that works in all browsers
+function generateId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 type GalleryType = "images" | "plots" | "data";
 
 interface Particle {
@@ -91,7 +100,7 @@ function ChatView({ onBack }: { onBack: () => void }) {
     if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       role: "user",
       content: inputValue.trim(),
       timestamp: new Date(),
@@ -135,7 +144,7 @@ function ChatView({ onBack }: { onBack: () => void }) {
       }
 
       const assistantMessage: Message = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: "assistant",
         content: result.message,
         timestamp: new Date(),
@@ -147,7 +156,7 @@ function ChatView({ onBack }: { onBack: () => void }) {
     } catch (error) {
       console.error("Error during analysis:", error);
       const errorMessage: Message = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: "assistant",
         content:
           "Sorry, I couldn't connect to the analysis server. Please make sure the backend is running.",
@@ -179,6 +188,7 @@ function ChatView({ onBack }: { onBack: () => void }) {
       <GalleryView
         type={galleryView}
         onBack={() => setGalleryView(null)}
+        sessionId={sessionId}
       />
     );
   }

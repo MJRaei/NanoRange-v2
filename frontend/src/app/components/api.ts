@@ -57,8 +57,12 @@ export async function analyzeImage(
 /**
  * List all available output files
  */
-export async function listFiles(): Promise<SidebarFiles> {
-  const response = await fetch(`${API_BASE_URL}/api/files/list`);
+export async function listFiles(sessionId?: string): Promise<SidebarFiles> {
+  const url = sessionId 
+    ? `${API_BASE_URL}/api/files/list?session_id=${encodeURIComponent(sessionId)}`
+    : `${API_BASE_URL}/api/files/list`;
+  
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error("Failed to list files");
@@ -92,9 +96,9 @@ export function getCsvUrl(path: string): string {
  * Get static URL for output files
  */
 export function getStaticUrl(path: string): string {
-  // Remove leading path components (src/output/ or output/)
-  const cleanPath = path.replace(/^(src\/)?output\//, "");
-  return `${API_BASE_URL}/static/output/${cleanPath}`;
+  // Remove leading path components (data/files/ or ./data/files/)
+  const cleanPath = path.replace(/^(\.\/)?data\/files\//, "");
+  return `${API_BASE_URL}/static/data/${cleanPath}`;
 }
 
 /**

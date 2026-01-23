@@ -75,7 +75,11 @@ def initialize_session(session_id: Optional[str] = None) -> str:
     registry.discover_tools()
     
     if session_id:
-        _current_session = SessionManager(session_id=session_id)
+        try:
+            _current_session = SessionManager(session_id=session_id)
+        except ValueError:
+            _current_session = SessionManager()
+            _current_session.create_session()
     else:
         _current_session = SessionManager()
         _current_session.create_session()

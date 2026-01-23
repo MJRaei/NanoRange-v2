@@ -5,15 +5,16 @@ Handles serving of analysis output files (images, HTML, CSV).
 """
 
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
+
+from nanorange.storage.file_store import FileStore
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
-OUTPUT_DIR = "output"
-SHAPES_DIR = os.path.join(OUTPUT_DIR, "5_shapes")
+file_store = FileStore()
 
 
 class FileInfo(BaseModel):
@@ -21,7 +22,7 @@ class FileInfo(BaseModel):
     name: str
     path: str
     type: str
-    interactive_html: str | None = None
+    interactive_html: Optional[str] = None
 
 
 class FilesResponse(BaseModel):
@@ -32,53 +33,60 @@ class FilesResponse(BaseModel):
 
 
 @router.get("/list")
-async def list_output_files():
+async def list_output_files(session_id: Optional[str] = Query(None)):
     """
     List all available output files organized by category.
     
+    Args:
+        session_id: Optional session ID to filter files
+    
     Returns:
         Organized list of images, plots, and CSV files
-        - images: All PNG/JPG files EXCEPT size_distribution (with linked interactive HTML if available)
-        - plots: Only size_distribution.png (with linked interactive HTML if available)
-        - csv_files: All CSV files for data download
     """
     images = []
     plots = []
     csv_files = []
     
-    if not os.path.exists(SHAPES_DIR):
+    if not session_id:
+        return FilesResponse(images=images, plots=plots, csv_files=csv_files)
+    
+    try:
+        files = file_store.list_files(session_id)
+    except Exception:
         return FilesResponse(images=images, plots=plots, csv_files=csv_files)
     
     html_files = {}
-    for filename in os.listdir(SHAPES_DIR):
-        if filename.endswith(".html"):
-            base_name = filename.replace(".html", "")
-            html_files[base_name] = os.path.join(SHAPES_DIR, filename)
+    for file_info in files:
+        if file_info["extension"].lower() == ".html":
+            base_name = file_info["name"].rsplit(".", 1)[0]
+            html_files[base_name] = file_info["path"]
     
-    for filename in os.listdir(SHAPES_DIR):
-        file_path = os.path.join(SHAPES_DIR, filename)
+    for file_info in files:
+        ext = file_info["extension"].lower()
+        name = file_info["name"]
+        path = file_info["path"]
         
-        if filename.endswith(".png") or filename.endswith(".jpg"):
-            base_name = filename.replace(".png", "").replace(".jpg", "")
+        if ext in [".png", ".jpg", ".jpeg"]:
+            base_name = name.rsplit(".", 1)[0]
             display_name = base_name.replace("_", " ").title()
             interactive_html = html_files.get(base_name)
             
-            file_info = FileInfo(
+            info = FileInfo(
                 name=display_name,
-                path=file_path,
+                path=path,
                 type="image",
                 interactive_html=interactive_html
             )
             
-            if base_name == "size_distribution":
-                plots.append(file_info)
+            if any(x in base_name.lower() for x in ["distribution", "histogram", "chart", "plot"]):
+                plots.append(info)
             else:
-                images.append(file_info)
+                images.append(info)
                 
-        elif filename.endswith(".csv"):
+        elif ext == ".csv":
             csv_files.append(FileInfo(
-                name=filename.replace("_", " ").replace(".csv", "").title(),
-                path=file_path,
+                name=name.replace("_", " ").replace(".csv", "").title(),
+                path=path,
                 type="csv"
             ))
     
@@ -97,19 +105,19 @@ async def get_image(filepath: str):
     Args:
         filepath: Path to the image file
     """
-    full_path = filepath
-    
-    if not os.path.exists(full_path):
+    if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Image not found")
     
-    if full_path.endswith(".png"):
+    if filepath.endswith(".png"):
         media_type = "image/png"
-    elif full_path.endswith(".jpg") or full_path.endswith(".jpeg"):
+    elif filepath.endswith(".jpg") or filepath.endswith(".jpeg"):
         media_type = "image/jpeg"
+    elif filepath.endswith(".tif") or filepath.endswith(".tiff"):
+        media_type = "image/tiff"
     else:
         media_type = "application/octet-stream"
     
-    return FileResponse(full_path, media_type=media_type)
+    return FileResponse(filepath, media_type=media_type)
 
 
 @router.get("/html/{filepath:path}")
@@ -120,12 +128,10 @@ async def get_html(filepath: str):
     Args:
         filepath: Path to the HTML file
     """
-    full_path = filepath
-    
-    if not os.path.exists(full_path):
+    if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="HTML file not found")
     
-    with open(full_path, 'r') as f:
+    with open(filepath, 'r') as f:
         content = f.read()
     
     return HTMLResponse(content=content)
@@ -139,15 +145,13 @@ async def get_csv(filepath: str):
     Args:
         filepath: Path to the CSV file
     """
-    full_path = filepath
-    
-    if not os.path.exists(full_path):
+    if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="CSV file not found")
     
     return FileResponse(
-        full_path,
+        filepath,
         media_type="text/csv",
-        filename=os.path.basename(full_path)
+        filename=os.path.basename(filepath)
     )
 
 
@@ -162,13 +166,11 @@ async def preview_csv(filepath: str, rows: int = 10):
     """
     import csv
     
-    full_path = filepath
-    
-    if not os.path.exists(full_path):
+    if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="CSV file not found")
     
     preview_data = []
-    with open(full_path, 'r') as f:
+    with open(filepath, 'r') as f:
         reader = csv.reader(f)
         for i, row in enumerate(reader):
             if i >= rows:
@@ -180,4 +182,3 @@ async def preview_csv(filepath: str, rows: int = 10):
         "data": preview_data[1:] if len(preview_data) > 1 else [],
         "total_preview_rows": len(preview_data) - 1
     }
-

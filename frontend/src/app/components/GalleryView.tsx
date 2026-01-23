@@ -9,9 +9,10 @@ type GalleryType = "images" | "plots" | "data";
 interface GalleryViewProps {
   type: GalleryType;
   onBack: () => void;
+  sessionId?: string | null;
 }
 
-export function GalleryView({ type, onBack }: GalleryViewProps) {
+export function GalleryView({ type, onBack, sessionId }: GalleryViewProps) {
   const [files, setFiles] = useState<SidebarFiles>({ images: [], plots: [], csv_files: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<FileInfo | null>(null);
@@ -20,7 +21,7 @@ export function GalleryView({ type, onBack }: GalleryViewProps) {
     const fetchFiles = async () => {
       setIsLoading(true);
       try {
-        const data = await listFiles();
+        const data = await listFiles(sessionId || undefined);
         setFiles(data);
       } catch (error) {
         console.error("Failed to fetch files:", error);
@@ -29,7 +30,7 @@ export function GalleryView({ type, onBack }: GalleryViewProps) {
       }
     };
     fetchFiles();
-  }, []);
+  }, [sessionId]);
 
   // Get the appropriate files based on type
   const getCurrentFiles = (): FileInfo[] => {

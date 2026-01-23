@@ -1,32 +1,27 @@
 """
 Chat API Routes
 
-Handles chat interactions with the cryo-TEM analysis agent.
+Handles chat interactions with the NanoRange analysis agent.
 """
 
 import os
-import sys
 import uuid
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
-
-from nanorange.agent import root_agent
+from nanorange.agent.orchestrator import NanoRangeOrchestrator
+from nanorange.storage.file_store import FileStore
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 UPLOAD_DIR = "uploads"
-OUTPUT_DIR = "output"
 
-session_service = InMemorySessionService()
+# Store orchestrator instances per session
+user_orchestrators: dict[str, NanoRangeOrchestrator] = {}
 
-user_sessions = {}
+# File store for accessing output files
+file_store = FileStore()
 
 
 class ChatRequest(BaseModel):
@@ -45,14 +40,27 @@ class AnalysisResult(BaseModel):
 
 
 def ensure_directories():
-    """Ensure upload and output directories exist."""
+    """Ensure upload directory exists."""
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-async def run_agent_chat(session_id: str, message: str, image_path: Optional[str] = None) -> tuple[str, bool]:
+def get_orchestrator(session_id: str) -> NanoRangeOrchestrator:
+    """Get or create orchestrator for a session."""
+    if session_id not in user_orchestrators:
+        user_orchestrators[session_id] = NanoRangeOrchestrator(
+            session_id=session_id,
+            mode="full"
+        )
+    return user_orchestrators[session_id]
+
+
+async def run_agent_chat(
+    session_id: str, 
+    message: str, 
+    image_path: Optional[str] = None
+) -> str:
     """
-    Run a chat with the ADK agent.
+    Run a chat with the NanoRange agent.
     
     Args:
         session_id: Session ID for conversation history
@@ -60,108 +68,68 @@ async def run_agent_chat(session_id: str, message: str, image_path: Optional[str
         image_path: Optional path to an uploaded image
         
     Returns:
-        Tuple of (agent response, whether analysis was run)
+        Agent response text
     """
+    orchestrator = get_orchestrator(session_id)
+    
     if image_path and os.path.exists(image_path):
-        full_message = f"{message}\n\n[User has uploaded an image at: {image_path}]"
+        response = await orchestrator.chat_with_image(message, image_path)
     else:
-        full_message = message
+        response = await orchestrator.chat(message)
     
-    if session_id not in user_sessions:
-        session = await session_service.create_session(
-            app_name="nanorange",
-            user_id=session_id,
-        )
-        user_sessions[session_id] = session.id
-    
-    adk_session_id = user_sessions[session_id]
-    
-    runner = Runner(
-        agent=root_agent,
-        app_name="nanorange",
-        session_service=session_service,
-    )
-    
-    content = types.Content(
-        role="user",
-        parts=[types.Part.from_text(text=full_message)]
-    )
-    
-    shapes_dir = "output/5_shapes"
-    csv_path = os.path.join(shapes_dir, "detected_shapes.csv")
-    pre_run_mtime = os.path.getmtime(csv_path) if os.path.exists(csv_path) else 0
-    
-    response_text = ""
-    
-    async for event in runner.run_async(
-        user_id=session_id,
-        session_id=adk_session_id,
-        new_message=content,
-    ):
-        if hasattr(event, 'content') and event.content:
-            for part in event.content.parts:
-                if hasattr(part, 'text') and part.text:
-                    response_text += part.text
-    
-    post_run_mtime = os.path.getmtime(csv_path) if os.path.exists(csv_path) else 0
-    analysis_run = post_run_mtime > pre_run_mtime
-    
-    return response_text, analysis_run
+    return response
 
 
-def collect_output_images() -> dict:
+def collect_output_images(session_id: str) -> dict:
     """
-    Collect all available output images after analysis.
+    Collect all available output images for a session.
     
     Returns:
         Dictionary of image paths
     """
     images = {}
-    shapes_dir = "output/5_shapes"
     
-    if not os.path.exists(shapes_dir):
-        return images
-    
-    if os.path.exists(os.path.join(shapes_dir, "thresholded_with_shapes.png")):
-        images["thresholded_with_shapes"] = f"{shapes_dir}/thresholded_with_shapes.png"
-    
-    if os.path.exists(os.path.join(shapes_dir, "size_distribution.png")):
-        images["size_distribution"] = f"{shapes_dir}/size_distribution.png"
-    
-    if os.path.exists(os.path.join(shapes_dir, "original.png")):
-        images["original"] = f"{shapes_dir}/original.png"
-    
-    if os.path.exists(os.path.join(shapes_dir, "final_colorized.png")):
-        images["colorized"] = f"{shapes_dir}/final_colorized.png"
-    
-    if os.path.exists(os.path.join(shapes_dir, "final_thresholded.png")):
-        images["thresholded"] = f"{shapes_dir}/final_thresholded.png"
-    
-    if os.path.exists(os.path.join(shapes_dir, "original_with_shapes.png")):
-        images["original_with_shapes"] = f"{shapes_dir}/original_with_shapes.png"
-    
-    if os.path.exists(os.path.join(shapes_dir, "colorized_with_shapes.png")):
-        images["colorized_with_shapes"] = f"{shapes_dir}/colorized_with_shapes.png"
-    
-    html_files = [
-        "original_with_shapes.html",
-        "colorized_with_shapes.html",
-        "thresholded_with_shapes.html",
-        "size_distribution.html"
-    ]
-    
-    for html_file in html_files:
-        if os.path.exists(os.path.join(shapes_dir, html_file)):
-            key = html_file.replace(".html", "_html")
-            images[key] = f"{shapes_dir}/{html_file}"
+    try:
+        orchestrator = user_orchestrators.get(session_id)
+        if not orchestrator:
+            return images
+        
+        nano_session_id = orchestrator.get_session_id()
+        files = file_store.list_files(nano_session_id)
+        
+        for file_info in files:
+            path = file_info["path"]
+            name = file_info["name"]
+            ext = file_info["extension"].lower()
+            
+            if ext in [".png", ".jpg", ".jpeg", ".tif", ".tiff"]:
+                key = name.rsplit(".", 1)[0]
+                images[key] = path
+                
+    except Exception:
+        pass
     
     return images
 
 
-def get_csv_path() -> Optional[str]:
-    """Get the path to the CSV file if it exists."""
-    csv_path = "output/5_shapes/detected_shapes.csv"
-    return csv_path if os.path.exists(csv_path) else None
+def get_csv_path(session_id: str) -> Optional[str]:
+    """Get the path to any CSV file in the session output."""
+    try:
+        orchestrator = user_orchestrators.get(session_id)
+        if not orchestrator:
+            return None
+        
+        nano_session_id = orchestrator.get_session_id()
+        files = file_store.list_files(nano_session_id)
+        
+        for file_info in files:
+            if file_info["extension"].lower() == ".csv":
+                return file_info["path"]
+                
+    except Exception:
+        pass
+    
+    return None
 
 
 @router.post("/upload-image")
@@ -202,7 +170,7 @@ async def analyze_endpoint(
     session_id: Optional[str] = Form(None)
 ):
     """
-    Chat with the NanOrange agent.
+    Chat with the NanoRange agent.
     
     The agent decides what to do based on the user's message
     and whether an image has been provided.
@@ -219,14 +187,14 @@ async def analyze_endpoint(
         session_id = str(uuid.uuid4())[:8]
     
     try:
-        agent_response, analysis_run = await run_agent_chat(
+        agent_response = await run_agent_chat(
             session_id=session_id,
             message=message,
             image_path=image_path
         )
         
-        images = collect_output_images() if analysis_run else {}
-        csv_path = get_csv_path() if analysis_run else None
+        images = collect_output_images(session_id)
+        csv_path = get_csv_path(session_id)
         
         return AnalysisResult(
             success=True,

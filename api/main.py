@@ -5,12 +5,9 @@ Main FastAPI application for the NanOrange cryo-TEM analysis tool.
 """
 
 import os
-import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from api.routes import chat_router, files_router
 
@@ -31,13 +28,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OUTPUT_DIR = "output"
+DATA_DIR = "data/files"
 UPLOADS_DIR = "uploads"
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-app.mount("/static/output", StaticFiles(directory=OUTPUT_DIR), name="output")
+app.mount("/static/data", StaticFiles(directory=DATA_DIR), name="data")
 app.mount("/static/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 app.include_router(chat_router)
