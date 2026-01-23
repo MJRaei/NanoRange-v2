@@ -71,6 +71,7 @@ venv.bak/
 
 # NanoRange specific
 data/
+tests/
 *.db
 *.sqlite
 
