@@ -10,3 +10,6 @@ export { NanoIcon } from "./NanoIcon";
 export * from "./types";
 export * from "./api";
 
+// Pipeline editor components
+export { PipelineEditor } from "./pipeline";
+

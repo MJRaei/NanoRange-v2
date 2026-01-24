@@ -13,6 +13,7 @@ import {
   MessageImage,
   analyzeImage,
   checkHealth,
+  PipelineEditor,
 } from "./components";
 
 // UUID generator that works in all browsers
@@ -46,7 +47,7 @@ function generateParticles(count: number): Particle[] {
   }));
 }
 
-function ChatView({ onBack }: { onBack: () => void }) {
+function ChatView() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -54,8 +55,8 @@ function ChatView({ onBack }: { onBack: () => void }) {
   const [galleryView, setGalleryView] = useState<GalleryType | null>(null);
   const [attachedImagePath, setAttachedImagePath] = useState<string | null>(null);
   const [attachedImagePreview, setAttachedImagePreview] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [showPipeline, setShowPipeline] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -76,11 +77,7 @@ function ChatView({ onBack }: { onBack: () => void }) {
 
   // Check API health on mount
   useEffect(() => {
-    const checkConnection = async () => {
-      const healthy = await checkHealth();
-      setIsConnected(healthy);
-    };
-    checkConnection();
+    checkHealth();
   }, []);
 
   const handleImageUploaded = (path: string, previewUrl: string) => {
@@ -194,7 +191,7 @@ function ChatView({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-screen" style={{ backgroundColor: "#0a0908" }}>
+    <div className="flex h-screen" style={{ backgroundColor: "#0a0908" }}>
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -202,11 +199,18 @@ function ChatView({ onBack }: { onBack: () => void }) {
         onNavigate={handleNavigateToGallery}
       />
 
-      {/* Main content wrapper */}
-      <div className="flex flex-col h-full">
+      {/* Left side - Chat */}
+      <div
+        className="flex flex-col h-full border-r"
+        style={{
+          width: showPipeline ? "50%" : "100%",
+          borderColor: "rgba(255, 107, 53, 0.1)",
+          transition: "width 0.3s ease",
+        }}
+      >
         {/* Header */}
         <header
-          className="flex items-center justify-center px-6 py-4 border-b"
+          className="flex items-center justify-between px-6 py-4 border-b shrink-0"
           style={{ borderColor: "rgba(255, 107, 53, 0.1)" }}
         >
           <div className="flex items-center gap-3">
@@ -216,6 +220,21 @@ function ChatView({ onBack }: { onBack: () => void }) {
               <span style={{ color: "#ff6b35" }}>Orange</span>
             </h1>
           </div>
+          <button
+            onClick={() => setShowPipeline(!showPipeline)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-white/5"
+            style={{ color: showPipeline ? "#ff6b35" : "#6a655d" }}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+              />
+            </svg>
+            {showPipeline ? "Hide Pipeline" : "Show Pipeline"}
+          </button>
         </header>
 
         {/* Chat area */}
@@ -227,52 +246,51 @@ function ChatView({ onBack }: { onBack: () => void }) {
                 <NanoIcon size="small" />
               </div>
               <h2
-                className="text-2xl md:text-3xl font-semibold mb-4 text-center"
+                className="text-2xl font-semibold mb-4 text-center"
                 style={{ color: "#c4b8a8" }}
               >
                 How can I help you analyze?
               </h2>
               <p
-                className="text-center max-w-md mb-8"
+                className="text-center max-w-md mb-8 text-sm"
                 style={{ color: "#6a655d", fontFamily: "'JetBrains Mono', monospace" }}
               >
-                Upload microscopy images, ask questions about image analysis, 
-                or request specific processing and measurement parameters.
+                Upload microscopy images, ask questions, or build a pipeline visually.
               </p>
 
               {/* Instructions for getting started */}
               <div
-                className="mt-12 p-6 rounded-xl max-w-lg"
+                className="p-4 rounded-xl max-w-sm"
                 style={{
                   backgroundColor: "rgba(255, 107, 53, 0.05)",
                   border: "1px solid rgba(255, 107, 53, 0.1)",
                 }}
               >
-                <h3 className="text-sm font-medium mb-3" style={{ color: "#ff6b35" }}>
+                <h3 className="text-xs font-medium mb-2" style={{ color: "#ff6b35" }}>
                   Getting Started
                 </h3>
                 <ol
-                  className="text-sm space-y-2"
+                  className="text-xs space-y-1.5"
                   style={{ color: "#8a857d", fontFamily: "'JetBrains Mono', monospace" }}
                 >
                   <li className="flex items-start gap-2">
                     <span style={{ color: "#ff6b35" }}>1.</span>
-                    Click the attachment button to upload a cryo-TEM image
+                    Upload an image and describe your analysis
                   </li>
                   <li className="flex items-start gap-2">
                     <span style={{ color: "#ff6b35" }}>2.</span>
-                    Type your analysis request or use a suggestion
+                    Or build a pipeline visually on the right
                   </li>
                   <li className="flex items-start gap-2">
                     <span style={{ color: "#ff6b35" }}>3.</span>
-                    View results in chat and explore the sidebar for more
+                    Run and iterate on your analysis
                   </li>
                 </ol>
               </div>
             </div>
           ) : (
             /* Messages */
-            <div className="max-w-3xl mx-auto px-6 py-8">
+            <div className="px-6 py-8">
               {messages.map((message) => (
                 <ChatMessage key={message.id} message={message} />
               ))}
@@ -286,8 +304,8 @@ function ChatView({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Input area */}
-        <div className="px-6 py-4">
-          <div className="max-w-3xl mx-auto">
+        <div className="px-6 py-4 shrink-0">
+          <div>
             {/* Attached image preview */}
             {attachedImagePreview && (
               <div className="mb-3">
@@ -353,6 +371,13 @@ function ChatView({ onBack }: { onBack: () => void }) {
           </div>
         </div>
       </div>
+
+      {/* Right side - Pipeline Editor */}
+      {showPipeline && (
+        <div className="flex-1 h-full">
+          <PipelineEditor />
+        </div>
+      )}
     </div>
   );
 }
@@ -368,7 +393,7 @@ export default function Home() {
   }, []);
 
   if (showChat) {
-    return <ChatView onBack={() => setShowChat(false)} />;
+    return <ChatView />;
   }
 
   return (
