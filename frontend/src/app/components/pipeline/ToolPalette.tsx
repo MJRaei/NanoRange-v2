@@ -13,11 +13,9 @@ const mockTools: ToolDefinition[] = [
   {
     id: 'load_image',
     name: 'Load Image',
-    description: 'Load an image from file path',
+    description: 'Load an image (source node)',
     category: 'io',
-    inputs: [
-      { name: 'path', type: 'PATH', description: 'Image file path', required: true },
-    ],
+    inputs: [],
     outputs: [
       { name: 'image', type: 'IMAGE', description: 'Loaded image' },
     ],
@@ -25,15 +23,12 @@ const mockTools: ToolDefinition[] = [
   {
     id: 'save_image',
     name: 'Save Image',
-    description: 'Save an image to file',
+    description: 'Save an image to file (sink node)',
     category: 'io',
     inputs: [
       { name: 'image', type: 'IMAGE', description: 'Image to save', required: true },
-      { name: 'path', type: 'PATH', description: 'Output file path', required: true },
     ],
-    outputs: [
-      { name: 'path', type: 'PATH', description: 'Saved file path' },
-    ],
+    outputs: [],
   },
   {
     id: 'gaussian_blur',
@@ -42,7 +37,6 @@ const mockTools: ToolDefinition[] = [
     category: 'preprocessing',
     inputs: [
       { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-      { name: 'sigma', type: 'FLOAT', description: 'Blur strength', required: false, default: 1.0 },
     ],
     outputs: [
       { name: 'image', type: 'IMAGE', description: 'Blurred image' },
@@ -67,10 +61,9 @@ const mockTools: ToolDefinition[] = [
     category: 'segmentation',
     inputs: [
       { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-      { name: 'method', type: 'STRING', description: 'Thresholding method', required: false, default: 'otsu' },
     ],
     outputs: [
-      { name: 'mask', type: 'MASK', description: 'Binary mask' },
+      { name: 'image', type: 'IMAGE', description: 'Thresholded image' },
     ],
   },
   {
@@ -79,51 +72,58 @@ const mockTools: ToolDefinition[] = [
     description: 'Apply morphological operations',
     category: 'segmentation',
     inputs: [
-      { name: 'mask', type: 'MASK', description: 'Input mask', required: true },
-      { name: 'operation', type: 'STRING', description: 'Operation type', required: false, default: 'open' },
+      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
     ],
     outputs: [
-      { name: 'mask', type: 'MASK', description: 'Processed mask' },
+      { name: 'image', type: 'IMAGE', description: 'Processed image' },
     ],
   },
   {
-    id: 'measure_area',
-    name: 'Measure Area',
-    description: 'Measure areas of detected objects',
-    category: 'measurement',
+    id: 'edge_detection',
+    name: 'Edge Detection',
+    description: 'Detect edges in image',
+    category: 'segmentation',
     inputs: [
-      { name: 'mask', type: 'MASK', description: 'Binary mask', required: true },
-      { name: 'pixel_size', type: 'FLOAT', description: 'Pixel size in nm', required: false, default: 1.0 },
+      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
     ],
     outputs: [
-      { name: 'measurements', type: 'MEASUREMENTS', description: 'Area measurements' },
+      { name: 'image', type: 'IMAGE', description: 'Edge image' },
+    ],
+  },
+  {
+    id: 'measure_particles',
+    name: 'Measure Particles',
+    description: 'Measure particle properties',
+    category: 'measurement',
+    inputs: [
+      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
+    ],
+    outputs: [
+      { name: 'image', type: 'IMAGE', description: 'Annotated image' },
     ],
   },
   {
     id: 'count_objects',
     name: 'Count Objects',
-    description: 'Count objects in mask',
+    description: 'Count objects in image',
     category: 'measurement',
     inputs: [
-      { name: 'mask', type: 'MASK', description: 'Binary mask', required: true },
+      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
     ],
     outputs: [
-      { name: 'count', type: 'INT', description: 'Object count' },
+      { name: 'image', type: 'IMAGE', description: 'Labeled image' },
     ],
   },
   {
     id: 'cellpose_segmentation',
     name: 'Cellpose',
-    description: 'Deep learning segmentation with Cellpose',
+    description: 'Deep learning segmentation',
     category: 'ml',
     inputs: [
       { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-      { name: 'model', type: 'STRING', description: 'Model type', required: false, default: 'cyto2' },
-      { name: 'diameter', type: 'FLOAT', description: 'Expected object diameter', required: false, default: 30.0 },
     ],
     outputs: [
-      { name: 'mask', type: 'MASK', description: 'Segmentation mask' },
-      { name: 'outlines', type: 'IMAGE', description: 'Object outlines' },
+      { name: 'image', type: 'IMAGE', description: 'Segmented image' },
     ],
   },
 ];
