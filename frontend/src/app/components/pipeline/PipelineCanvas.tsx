@@ -58,6 +58,10 @@ export function PipelineCanvas({
     sourceNodeId: string;
     sourceOutput: string;
   } | null>(null);
+  const [hoveredPort, setHoveredPort] = useState<{
+    nodeId: string;
+    inputName: string;
+  } | null>(null);
 
   // Handle node dragging
   const handleNodeDragStart = useCallback(
@@ -95,21 +99,23 @@ export function PipelineCanvas({
     [pipeline.nodes]
   );
 
-  const handleConnectionEnd = useCallback(
-    (targetNodeId: string, targetInput: string) => {
-      if (pendingConnection) {
-        onAddEdge({
-          sourceNodeId: pendingConnection.sourceNodeId,
-          sourceOutput: pendingConnection.sourceOutput,
-          targetNodeId,
-          targetInput,
-        });
-        setPendingConnection(null);
-        setDragState({ type: null });
+  // Track which input port is being hovered during connection drag
+  const handleInputHover = useCallback(
+    (nodeId: string | null, inputName: string | null) => {
+      if (nodeId && inputName) {
+        setHoveredPort({ nodeId, inputName });
+      } else {
+        setHoveredPort(null);
       }
     },
-    [pendingConnection, onAddEdge]
+    []
   );
+
+  // Use refs to access latest values in event handlers
+  const pendingConnectionRef = useRef(pendingConnection);
+  const hoveredPortRef = useRef(hoveredPort);
+  pendingConnectionRef.current = pendingConnection;
+  hoveredPortRef.current = hoveredPort;
 
   // Global mouse move handler
   useEffect(() => {
@@ -135,8 +141,18 @@ export function PipelineCanvas({
     };
 
     const handleMouseUp = () => {
+      // If we were dragging a connection and hovering over an input, create the edge
+      if (pendingConnectionRef.current && hoveredPortRef.current) {
+        onAddEdge({
+          sourceNodeId: pendingConnectionRef.current.sourceNodeId,
+          sourceOutput: pendingConnectionRef.current.sourceOutput,
+          targetNodeId: hoveredPortRef.current.nodeId,
+          targetInput: hoveredPortRef.current.inputName,
+        });
+      }
       setDragState({ type: null });
       setPendingConnection(null);
+      setHoveredPort(null);
     };
 
     if (dragState.type) {
@@ -148,7 +164,7 @@ export function PipelineCanvas({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragState, onUpdateNodePosition]);
+  }, [dragState, onUpdateNodePosition, onAddEdge]);
 
   // Handle canvas click to deselect
   const handleCanvasClick = useCallback(
@@ -298,7 +314,7 @@ export function PipelineCanvas({
           onDelete={onDeleteNode}
           onDragStart={handleNodeDragStart}
           onConnectionStart={handleConnectionStart}
-          onConnectionEnd={handleConnectionEnd}
+          onInputHover={handleInputHover}
         />
       ))}
 

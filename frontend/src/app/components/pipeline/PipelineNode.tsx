@@ -17,7 +17,7 @@ interface PipelineNodeProps {
   onDelete: (nodeId: string) => void;
   onDragStart: (nodeId: string, e: ReactMouseEvent) => void;
   onConnectionStart: (nodeId: string, outputName: string, e: ReactMouseEvent) => void;
-  onConnectionEnd: (nodeId: string, inputName: string) => void;
+  onInputHover: (nodeId: string | null, inputName: string | null) => void;
 }
 
 const categoryColors: Record<string, string> = {
@@ -39,7 +39,7 @@ export function PipelineNode({
   onDelete,
   onDragStart,
   onConnectionStart,
-  onConnectionEnd,
+  onInputHover,
 }: PipelineNodeProps) {
   const categoryColor = categoryColors[node.tool.category] || categoryColors.default;
 
@@ -67,13 +67,6 @@ export function PipelineNode({
       onConnectionStart(node.id, outputName, e);
     },
     [node.id, onConnectionStart]
-  );
-
-  const handleInputMouseUp = useCallback(
-    (inputName: string) => {
-      onConnectionEnd(node.id, inputName);
-    },
-    [node.id, onConnectionEnd]
   );
 
   const isInputConnected = (inputName: string): boolean => {
@@ -147,7 +140,6 @@ export function PipelineNode({
               <div
                 key={input.name}
                 className="flex items-center gap-2 group"
-                onMouseUp={() => handleInputMouseUp(input.name)}
               >
                 <div
                   className={`
@@ -156,6 +148,8 @@ export function PipelineNode({
                       ? 'bg-green-500 border-green-400'
                       : 'bg-transparent border-gray-500 group-hover:border-gray-300'}
                   `}
+                  onMouseEnter={() => onInputHover(node.id, input.name)}
+                  onMouseLeave={() => onInputHover(null, null)}
                 />
                 <span className="text-xs text-gray-400">
                   {input.name}

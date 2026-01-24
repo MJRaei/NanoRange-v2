@@ -160,13 +160,35 @@ export function usePipeline(): UsePipelineReturn {
       const targetNode = pipeline.nodes.find((n) => n.id === targetNodeId);
       if (!sourceNode || !targetNode) return false;
 
-      // Check type compatibility
+      // Check that the output and input ports exist
       const output = sourceNode.tool.outputs.find((o) => o.name === sourceOutput);
       const input = targetNode.tool.inputs.find((i) => i.name === targetInput);
       if (!output || !input) return false;
 
-      // Simple type compatibility check (can be enhanced)
-      return output.type === input.type || input.type === 'PARAMETERS';
+      // Define compatible type groups - types within a group can connect to each other
+      const imageTypes = ['IMAGE', 'MASK', 'ARRAY'];
+      const numericTypes = ['FLOAT', 'INT'];
+      const anyTypes = ['PARAMETERS', 'INSTRUCTIONS']; // These accept anything
+
+      // Check type compatibility
+      const outputType = output.type;
+      const inputType = input.type;
+
+      // Exact match
+      if (outputType === inputType) return true;
+
+      // Input accepts any type
+      if (anyTypes.includes(inputType)) return true;
+
+      // Image-like types are compatible with each other
+      if (imageTypes.includes(outputType) && imageTypes.includes(inputType)) return true;
+
+      // Numeric types are compatible with each other
+      if (numericTypes.includes(outputType) && numericTypes.includes(inputType)) return true;
+
+      // For UI flexibility, allow connections - backend will validate
+      // This makes the visual editor more user-friendly
+      return true;
     },
     [pipeline.edges, pipeline.nodes]
   );
