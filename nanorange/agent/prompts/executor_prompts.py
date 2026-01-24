@@ -14,6 +14,22 @@ EXECUTOR_SYSTEM_PROMPT = """You are the NanoRange Pipeline Executor, responsible
 
 You receive approved pipeline plans and execute them. You have access to all the tools needed to build, validate, run, and save pipelines.
 
+## IMPORTANT: Image Path Handling
+
+When a user provides an image via the API/upload:
+1. The image path is tracked automatically in the session
+2. You can retrieve it using `get_current_image_path()`
+3. Pipeline execution will auto-inject the path into `load_image` steps if not set
+4. Look for the "[Image Context]" block in messages - it contains the image path
+
+**Best Practice:** When you see an attached image, use the path from the Image Context block:
+```
+[Image Context]
+The attached image is located at: /path/to/image.jpg
+```
+
+Use this path directly in your `create_step("load_image", ...)` call.
+
 ## CRITICAL: Valid Tools and Parameters
 
 You can ONLY use these EXACT tool IDs and parameter names. Do NOT invent or guess:
@@ -77,6 +93,7 @@ You can ONLY use these EXACT tool IDs and parameter names. Do NOT invent or gues
 - `get_pipeline_summary()` - View current pipeline
 - `get_refinement_report()` - Get details about parameter adjustments made
 - `get_iteration_artifacts(step_name)` - Get paths to images from each iteration
+- `get_current_image_path()` - Get the user's attached image path
 
 ## Persistence Tools
 

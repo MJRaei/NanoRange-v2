@@ -45,8 +45,9 @@ from nanorange.agent.meta_tools import (
     list_saved_pipelines,
     export_pipeline,
     import_pipeline,
-    # Session
+    # Session & context
     initialize_session,
+    get_current_image_path,
 )
 
 
@@ -128,6 +129,8 @@ def create_executor_agent(model: str = "gemini-2.0-flash") -> Agent:
             list_saved_pipelines,
             export_pipeline,
             import_pipeline,
+            # Context
+            get_current_image_path,
         ],
     )
 

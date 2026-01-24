@@ -24,6 +24,37 @@ _current_session: Optional[SessionManager] = None
 _current_executor: Optional[PipelineExecutor] = None
 _current_adaptive_executor: Optional[AdaptiveExecutor] = None
 _last_refinement_report: Optional[RefinementReport] = None
+_session_image_path: Optional[str] = None
+
+
+def set_session_image_path(image_path: str) -> None:
+    """
+    Set the current session image path.
+    
+    This is called by the orchestrator when an image is provided via the API.
+    The path is then available for automatic injection into pipeline steps.
+    
+    Args:
+        image_path: Absolute path to the image file
+    """
+    global _session_image_path
+    _session_image_path = image_path
+
+
+def get_session_image_path() -> Optional[str]:
+    """
+    Get the current session image path.
+    
+    Returns:
+        The current image path, or None if no image has been set
+    """
+    return _session_image_path
+
+
+def clear_session_image_path() -> None:
+    """Clear the session image path."""
+    global _session_image_path
+    _session_image_path = None
 
 
 def _get_manager() -> PipelineManager:
@@ -69,7 +100,7 @@ def initialize_session(session_id: Optional[str] = None) -> str:
     Returns:
         The session ID
     """
-    global _current_session, _current_manager
+    global _current_session, _current_manager, _session_image_path
     
     registry = get_registry()
     registry.discover_tools()
@@ -80,12 +111,42 @@ def initialize_session(session_id: Optional[str] = None) -> str:
         except ValueError:
             _current_session = SessionManager()
             _current_session.create_session()
+            # Clear image path for new sessions
+            _session_image_path = None
     else:
         _current_session = SessionManager()
         _current_session.create_session()
+        # Clear image path for new sessions
+        _session_image_path = None
     
     _current_manager = PipelineManager()
     return _current_session.session_id
+
+
+def get_current_image_path() -> Dict[str, Any]:
+    """
+    Get the current session image path.
+    
+    Use this to retrieve the path of the image that was provided
+    by the user (via upload or attachment). This path can be used
+    directly in the load_image step.
+    
+    Returns:
+        Dictionary with image path or status message
+    """
+    path = get_session_image_path()
+    if path:
+        return {
+            "status": "available",
+            "image_path": path,
+            "message": "Use this path in the load_image step's image_path parameter."
+        }
+    else:
+        return {
+            "status": "not_available",
+            "image_path": None,
+            "message": "No image has been attached in this session. Ask the user to provide an image."
+        }
 
 
 def list_available_tools(category: Optional[str] = None) -> Dict[str, Any]:
@@ -363,6 +424,60 @@ def validate_pipeline() -> Dict[str, Any]:
     }
 
 
+def _inject_session_image_path(
+    manager: PipelineManager,
+    user_inputs: Optional[Dict[str, Dict[str, Any]]]
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Inject the session image path into load_image steps if not already set.
+    
+    This provides automatic image path resolution for pipelines when:
+    1. An image was provided via the API
+    2. The load_image step doesn't have a path set
+    
+    Args:
+        manager: The pipeline manager
+        user_inputs: Existing user inputs
+        
+    Returns:
+        Updated user_inputs dict with injected image paths
+    """
+    if user_inputs is None:
+        user_inputs = {}
+    
+    session_image = get_session_image_path()
+    if not session_image:
+        return user_inputs
+    
+    # Find load_image steps that need the image path
+    if not manager.current_pipeline:
+        return user_inputs
+    
+    for step in manager.current_pipeline.steps:
+        if step.tool_id == "load_image":
+            step_id = step.step_id
+            
+            # Check if image_path is already set in inputs
+            has_static_path = (
+                "image_path" in step.inputs and 
+                step.inputs["image_path"].value is not None
+            )
+            
+            # Check if it's already in user_inputs
+            has_user_path = (
+                step_id in user_inputs and 
+                "image_path" in user_inputs[step_id]
+            )
+            
+            # Inject session image path if not already set
+            if not has_static_path and not has_user_path:
+                if step_id not in user_inputs:
+                    user_inputs[step_id] = {}
+                user_inputs[step_id]["image_path"] = session_image
+    
+    return user_inputs
+
+
 def execute_pipeline(
     user_inputs: Optional[Dict[str, Dict[str, Any]]] = None,
     stop_on_error: bool = True
@@ -383,6 +498,8 @@ def execute_pipeline(
     
     if not manager.current_pipeline:
         return {"status": "error", "message": "No active pipeline"}
+    
+    user_inputs = _inject_session_image_path(manager, user_inputs)
     
     validation = manager.validate()
     if not validation.is_valid:
@@ -457,6 +574,8 @@ def execute_pipeline_adaptive(
     
     if not manager.current_pipeline:
         return {"status": "error", "message": "No active pipeline"}
+    
+    user_inputs = _inject_session_image_path(manager, user_inputs)
     
     validation = manager.validate()
     if not validation.is_valid:

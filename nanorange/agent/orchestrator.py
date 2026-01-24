@@ -8,6 +8,7 @@ Provides:
 """
 
 import asyncio
+import os
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from uuid import uuid4
 from google.adk.agents import Agent
@@ -21,7 +22,7 @@ from nanorange.agent.agents import (
     create_standalone_planner,
     create_standalone_executor,
 )
-from nanorange.agent.meta_tools import initialize_session
+from nanorange.agent.meta_tools import initialize_session, set_session_image_path
 
 
 class NanoRangeOrchestrator:
@@ -124,32 +125,36 @@ class NanoRangeOrchestrator:
         """
         from pathlib import Path
         from PIL import Image
-        import base64
         import io
         
         await self._ensure_session()
         
-        # Load and encode image
         img_path = Path(image_path)
+        if not img_path.is_absolute():
+            img_path = Path(os.getcwd()) / img_path
+        
         if not img_path.exists():
             return f"Error: Image not found at {image_path}"
         
-        # Read image and convert to base64
+        absolute_path = str(img_path.resolve())
+        set_session_image_path(absolute_path)
+        
         with Image.open(img_path) as img:
-            # Convert to RGB if necessary
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             
-            # Save to bytes
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG')
             image_bytes = buffer.getvalue()
         
-        # Create content with image
+        enhanced_message = self._format_message_with_image_context(
+            message, absolute_path
+        )
+        
         content = types.Content(
             role="user",
             parts=[
-                types.Part(text=message),
+                types.Part(text=enhanced_message),
                 types.Part(
                     inline_data=types.Blob(
                         mime_type="image/jpeg",
@@ -172,6 +177,30 @@ class NanoRangeOrchestrator:
                         response_text += part.text
         
         return response_text.strip() if response_text else "I processed your request."
+    
+    def _format_message_with_image_context(
+        self, 
+        message: str, 
+        image_path: str
+    ) -> str:
+        """
+        Format the user message to include image path context.
+        
+        This ensures the agent knows the file location for pipeline building.
+        
+        Args:
+            message: Original user message
+            image_path: Absolute path to the image file
+            
+        Returns:
+            Enhanced message with path context
+        """
+        context_block = (
+            f"[Image Context]\n"
+            f"The attached image is located at: {image_path}\n"
+            f"Use this path when building pipelines with load_image.\n\n"
+        )
+        return context_block + message
     
     async def close(self):
         """Clean up resources."""
