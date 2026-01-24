@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, KeyboardEvent } from "react";
+import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import {
   Sidebar,
   GalleryView,
@@ -57,8 +57,47 @@ function ChatView() {
   const [attachedImagePreview, setAttachedImagePreview] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showPipeline, setShowPipeline] = useState(true);
+  const [splitPosition, setSplitPosition] = useState(50); // percentage
+  const [isResizing, setIsResizing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Handle resize drag
+  const handleMouseDown = useCallback(() => {
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !containerRef.current) return;
+
+      const container = containerRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const newPosition = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+
+      // Clamp between 20% and 80%
+      setSplitPosition(Math.min(80, Math.max(20, newPosition)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -191,7 +230,7 @@ function ChatView() {
   }
 
   return (
-    <div className="flex h-screen" style={{ backgroundColor: "#0a0908" }}>
+    <div ref={containerRef} className="flex h-screen" style={{ backgroundColor: "#0a0908" }}>
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -201,11 +240,10 @@ function ChatView() {
 
       {/* Left side - Chat */}
       <div
-        className="flex flex-col h-full border-r"
+        className="flex flex-col h-full"
         style={{
-          width: showPipeline ? "50%" : "100%",
-          borderColor: "rgba(255, 107, 53, 0.1)",
-          transition: "width 0.3s ease",
+          width: showPipeline ? `${splitPosition}%` : "100%",
+          transition: isResizing ? "none" : "width 0.3s ease",
         }}
       >
         {/* Header */}
@@ -372,9 +410,25 @@ function ChatView() {
         </div>
       </div>
 
+      {/* Resize Handle */}
+      {showPipeline && (
+        <div
+          className="w-1 h-full cursor-col-resize group flex items-center justify-center hover:bg-orange-500/20 transition-colors"
+          style={{
+            backgroundColor: isResizing ? "rgba(255, 107, 53, 0.3)" : "rgba(255, 107, 53, 0.1)",
+          }}
+          onMouseDown={handleMouseDown}
+        >
+          <div
+            className="w-1 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ backgroundColor: "#ff6b35" }}
+          />
+        </div>
+      )}
+
       {/* Right side - Pipeline Editor */}
       {showPipeline && (
-        <div className="flex-1 h-full">
+        <div className="h-full" style={{ width: `${100 - splitPosition}%` }}>
           <PipelineEditor />
         </div>
       )}
