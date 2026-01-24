@@ -71,30 +71,33 @@ def save_image(
 ) -> Dict[str, Any]:
     """
     Save an image to disk.
-    
+
     Args:
         image_path: Path to source image
-        output_path: Path to save the image
+        output_path: Path to save the image (can be file path or directory)
         format: Output format (png, jpg, tiff)
-        
+
     Returns:
         Dictionary with saved image path
     """
     import shutil
-    
+
     source = Path(image_path)
     dest = Path(output_path)
-    
+
     if not source.exists():
         raise FileNotFoundError(f"Source image not found: {image_path}")
-    
-    # Ensure output directory exists
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Copy file (in real implementation, might convert format)
-    shutil.copy2(source, dest)
-    
-    return {"saved_path": str(dest.absolute())}
+
+    if dest.is_dir():
+        actual_dest = dest / source.name
+    else:
+        actual_dest = dest
+
+    actual_dest.parent.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(source, actual_dest)
+
+    return {"saved_path": str(actual_dest.absolute())}
 
 
 SAVE_IMAGE_SCHEMA = ToolSchema(
