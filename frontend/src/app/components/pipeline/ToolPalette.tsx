@@ -7,126 +7,7 @@
 
 import React, { useState, useCallback } from 'react';
 import type { ToolDefinition } from './types';
-
-// Mock tools for initial UI - will be replaced with API call
-const mockTools: ToolDefinition[] = [
-  {
-    id: 'load_image',
-    name: 'Load Image',
-    description: 'Load an image (source node)',
-    category: 'io',
-    inputs: [],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Loaded image' },
-    ],
-  },
-  {
-    id: 'save_image',
-    name: 'Save Image',
-    description: 'Save an image to file (sink node)',
-    category: 'io',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Image to save', required: true },
-    ],
-    outputs: [],
-  },
-  {
-    id: 'gaussian_blur',
-    name: 'Gaussian Blur',
-    description: 'Apply Gaussian blur to reduce noise',
-    category: 'preprocessing',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-    ],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Blurred image' },
-    ],
-  },
-  {
-    id: 'normalize',
-    name: 'Normalize',
-    description: 'Normalize image intensity',
-    category: 'preprocessing',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-    ],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Normalized image' },
-    ],
-  },
-  {
-    id: 'threshold',
-    name: 'Threshold',
-    description: 'Apply thresholding to create binary mask',
-    category: 'segmentation',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-    ],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Thresholded image' },
-    ],
-  },
-  {
-    id: 'morphological_ops',
-    name: 'Morphological Ops',
-    description: 'Apply morphological operations',
-    category: 'segmentation',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-    ],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Processed image' },
-    ],
-  },
-  {
-    id: 'edge_detection',
-    name: 'Edge Detection',
-    description: 'Detect edges in image',
-    category: 'segmentation',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-    ],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Edge image' },
-    ],
-  },
-  {
-    id: 'measure_particles',
-    name: 'Measure Particles',
-    description: 'Measure particle properties',
-    category: 'measurement',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-    ],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Annotated image' },
-    ],
-  },
-  {
-    id: 'count_objects',
-    name: 'Count Objects',
-    description: 'Count objects in image',
-    category: 'measurement',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-    ],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Labeled image' },
-    ],
-  },
-  {
-    id: 'cellpose_segmentation',
-    name: 'Cellpose',
-    description: 'Deep learning segmentation',
-    category: 'ml',
-    inputs: [
-      { name: 'image', type: 'IMAGE', description: 'Input image', required: true },
-    ],
-    outputs: [
-      { name: 'image', type: 'IMAGE', description: 'Segmented image' },
-    ],
-  },
-];
+import { useTools } from '../../hooks/useTools';
 
 const categoryColors: Record<string, string> = {
   io: '#3b82f6',
@@ -151,6 +32,7 @@ interface ToolPaletteProps {
 }
 
 export function ToolPalette({ onToolSelect }: ToolPaletteProps) {
+  const { tools, loading, error, refetch } = useTools();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['io', 'preprocessing', 'segmentation'])
@@ -177,7 +59,7 @@ export function ToolPalette({ onToolSelect }: ToolPaletteProps) {
   );
 
   // Group tools by category
-  const toolsByCategory = mockTools.reduce<Record<string, ToolDefinition[]>>(
+  const toolsByCategory = tools.reduce<Record<string, ToolDefinition[]>>(
     (acc, tool) => {
       if (!acc[tool.category]) {
         acc[tool.category] = [];
@@ -199,6 +81,57 @@ export function ToolPalette({ onToolSelect }: ToolPaletteProps) {
       ),
     }))
     .filter(({ tools }) => tools.length > 0);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col" style={{ backgroundColor: '#111' }}>
+        <div className="p-3 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+          <h3 className="text-sm font-semibold text-white mb-2">Tools</h3>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-2"></div>
+            <p className="text-sm text-gray-400">Loading tools...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full flex flex-col" style={{ backgroundColor: '#111' }}>
+        <div className="p-3 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+          <h3 className="text-sm font-semibold text-white mb-2">Tools</h3>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <svg
+            className="w-12 h-12 text-red-500 mb-3"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <p className="text-sm text-red-400 mb-2 font-medium">Failed to load tools</p>
+          <p className="text-xs text-gray-500 mb-4 text-center max-w-xs">{error}</p>
+          <button
+            onClick={refetch}
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: '#111' }}>

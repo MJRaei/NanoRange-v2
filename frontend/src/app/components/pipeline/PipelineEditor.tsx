@@ -11,6 +11,7 @@ import { ToolPalette } from './ToolPalette';
 import { ParameterPanel } from './ParameterPanel';
 import { PipelineToolbar } from './PipelineToolbar';
 import { usePipeline } from './hooks/usePipeline';
+import { pipelineService } from '../../services/pipelineService';
 import type { ToolDefinition, Position } from './types';
 
 interface PipelineEditorProps {
@@ -51,6 +52,20 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
   const toggleLeftPanel = () => setIsLeftCollapsed(!isLeftCollapsed);
   const toggleRightPanel = () => setIsRightCollapsed(!isRightCollapsed);
 
+  const handleSave = useCallback(async () => {
+    try {
+      const pipelineId = await pipelineService.savePipeline(
+        pipeline,
+        pipeline.name
+      );
+      console.log('Pipeline saved successfully:', pipelineId);
+      // TODO: Show success toast/notification
+    } catch (error) {
+      console.error('Failed to save pipeline:', error);
+      // TODO: Show error toast/notification
+    }
+  }, [pipeline]);
+
   return (
     <div className={`flex flex-col h-full ${className}`} style={{ backgroundColor: '#0a0908' }}>
       {/* Toolbar */}
@@ -60,6 +75,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
         executionState={executionState}
         onRun={runPipeline}
         onClear={clearPipeline}
+        onSave={handleSave}
         onNameChange={setPipelineName}
       />
 

@@ -13,6 +13,7 @@ import type {
   NodeInputValue,
   PipelineExecutionState,
 } from '../types';
+import { pipelineService } from '../../../services/pipelineService';
 
 function generateId(): string {
   return 'node_' + Math.random().toString(36).substr(2, 9);
@@ -277,28 +278,49 @@ export function usePipeline(): UsePipelineReturn {
   const runPipeline = useCallback(async () => {
     setExecutionState({ status: 'running' });
 
-    // Simulate pipeline execution (will be connected to backend later)
     try {
-      // For now, just simulate running through nodes
-      for (const node of pipeline.nodes) {
-        setExecutionState((prev) => ({
-          ...prev,
-          currentNodeId: node.id,
-        }));
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
+      // Start pipeline execution on backend
+      const { execution_id } = await pipelineService.executePipeline(pipeline);
 
-      setExecutionState({
-        status: 'success',
-        results: { message: 'Pipeline completed successfully' },
-      });
+      // Poll for status updates
+      const pollStatus = async () => {
+        try {
+          const status = await pipelineService.getExecutionStatus(execution_id);
+
+          // Map backend status to frontend status
+          const frontendStatus =
+            status.status === 'completed' ? 'success' :
+            status.status === 'failed' ? 'error' :
+            'running';
+
+          setExecutionState({
+            status: frontendStatus as 'idle' | 'running' | 'success' | 'error',
+            currentNodeId: status.current_step,
+            results: status.result?.final_outputs,
+            error: status.error,
+          });
+
+          // Continue polling if still running
+          if (status.status === 'running') {
+            setTimeout(pollStatus, 1000); // Poll every 1 second
+          }
+        } catch (error) {
+          setExecutionState({
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Status check failed',
+          });
+        }
+      };
+
+      // Start polling
+      pollStatus();
     } catch (error) {
       setExecutionState({
         status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Execution failed',
       });
     }
-  }, [pipeline.nodes]);
+  }, [pipeline]);
 
   return {
     pipeline,
