@@ -2,7 +2,8 @@
 
 /**
  * PipelineCanvas Component
- * The main canvas where nodes are displayed and can be connected
+ * The main canvas where nodes are displayed and can be connected.
+ * Uses simplified side ports for image/mask connections.
  */
 
 import React, {
@@ -20,6 +21,7 @@ import type {
   Position,
   PipelineExecutionState,
 } from './types';
+import { getPortConfig } from './utils/connectionUtils';
 
 interface PipelineCanvasProps {
   pipeline: Pipeline;
@@ -28,9 +30,10 @@ interface PipelineCanvasProps {
   onSelectNode: (nodeId: string | null) => void;
   onDeleteNode: (nodeId: string) => void;
   onUpdateNodePosition: (nodeId: string, position: Position) => void;
-  onAddEdge: (edge: Omit<PipelineEdge, 'id'>) => string | null;
+  onAddEdge: (sourceNodeId: string, targetNodeId: string) => string | null;
   onDropTool: (tool: ToolDefinition, position: Position) => void;
   getNodeInputConnections: (nodeId: string) => PipelineEdge[];
+  getNodeOutputConnections: (nodeId: string) => PipelineEdge[];
 }
 
 interface DragState {
@@ -38,8 +41,16 @@ interface DragState {
   nodeId?: string;
   startPos?: Position;
   currentPos?: Position;
-  sourceOutput?: string;
 }
+
+// Constants for node dimensions (must match actual CSS)
+const NODE_WIDTH = 180;
+const NODE_HEADER_HEIGHT = 36; // Header with py-2
+const NODE_TITLE_HEIGHT = 33; // Tool name with py-2 + border
+const NODE_CONNECTABLE_ROW = 29; // Connectable input row with py-1.5 + border
+const NODE_ROW_HEIGHT = 22; // Each parameter/output row
+const NODE_SECTION_PADDING = 16; // Section py-2 padding
+const NODE_SECTION_HEADER = 14; // "Parameters", "Outputs" label height
 
 export function PipelineCanvas({
   pipeline,
@@ -51,17 +62,40 @@ export function PipelineCanvas({
   onAddEdge,
   onDropTool,
   getNodeInputConnections,
+  getNodeOutputConnections,
 }: PipelineCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [dragState, setDragState] = useState<DragState>({ type: null });
   const [pendingConnection, setPendingConnection] = useState<{
     sourceNodeId: string;
-    sourceOutput: string;
   } | null>(null);
-  const [hoveredPort, setHoveredPort] = useState<{
-    nodeId: string;
-    inputName: string;
-  } | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+  // Calculate node height based on its content
+  const getNodeHeight = useCallback((node: typeof pipeline.nodes[0]): number => {
+    const portConfig = getPortConfig(node.tool);
+    let height = NODE_HEADER_HEIGHT + NODE_TITLE_HEIGHT;
+
+    // Connectable input row (with py-1.5 padding)
+    if (portConfig.hasInputPort) {
+      height += NODE_CONNECTABLE_ROW;
+    }
+
+    // Non-connectable inputs (parameters section)
+    const parameterInputs = node.tool.inputs.filter(i =>
+      !['IMAGE', 'MASK', 'ARRAY'].includes(i.type)
+    );
+    if (parameterInputs.length > 0) {
+      height += NODE_SECTION_PADDING + NODE_SECTION_HEADER + parameterInputs.length * NODE_ROW_HEIGHT;
+    }
+
+    // Outputs section
+    if (node.tool.outputs.length > 0) {
+      height += NODE_SECTION_PADDING + NODE_SECTION_HEADER + node.tool.outputs.length * NODE_ROW_HEIGHT;
+    }
+
+    return height;
+  }, []);
 
   // Handle node dragging
   const handleNodeDragStart = useCallback(
@@ -78,20 +112,23 @@ export function PipelineCanvas({
     [pipeline.nodes]
   );
 
-  // Handle connection dragging
+  // Handle connection dragging from output port
   const handleConnectionStart = useCallback(
-    (nodeId: string, outputName: string, e: ReactMouseEvent) => {
+    (nodeId: string, e: ReactMouseEvent) => {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
 
       const node = pipeline.nodes.find((n) => n.id === nodeId);
       if (!node) return;
 
-      setPendingConnection({ sourceNodeId: nodeId, sourceOutput: outputName });
+      // Verify this node has an output port
+      const portConfig = getPortConfig(node.tool);
+      if (!portConfig.hasOutputPort) return;
+
+      setPendingConnection({ sourceNodeId: nodeId });
       setDragState({
         type: 'connection',
         nodeId,
-        sourceOutput: outputName,
         startPos: { x: e.clientX - rect.left, y: e.clientY - rect.top },
         currentPos: { x: e.clientX - rect.left, y: e.clientY - rect.top },
       });
@@ -99,23 +136,16 @@ export function PipelineCanvas({
     [pipeline.nodes]
   );
 
-  // Track which input port is being hovered during connection drag
-  const handleInputHover = useCallback(
-    (nodeId: string | null, inputName: string | null) => {
-      if (nodeId && inputName) {
-        setHoveredPort({ nodeId, inputName });
-      } else {
-        setHoveredPort(null);
-      }
-    },
-    []
-  );
+  // Track which node's input port is being hovered
+  const handleInputPortHover = useCallback((nodeId: string | null) => {
+    setHoveredNodeId(nodeId);
+  }, []);
 
   // Use refs to access latest values in event handlers
   const pendingConnectionRef = useRef(pendingConnection);
-  const hoveredPortRef = useRef(hoveredPort);
+  const hoveredNodeIdRef = useRef(hoveredNodeId);
   pendingConnectionRef.current = pendingConnection;
-  hoveredPortRef.current = hoveredPort;
+  hoveredNodeIdRef.current = hoveredNodeId;
 
   // Global mouse move handler
   useEffect(() => {
@@ -141,18 +171,16 @@ export function PipelineCanvas({
     };
 
     const handleMouseUp = () => {
-      // If we were dragging a connection and hovering over an input, create the edge
-      if (pendingConnectionRef.current && hoveredPortRef.current) {
-        onAddEdge({
-          sourceNodeId: pendingConnectionRef.current.sourceNodeId,
-          sourceOutput: pendingConnectionRef.current.sourceOutput,
-          targetNodeId: hoveredPortRef.current.nodeId,
-          targetInput: hoveredPortRef.current.inputName,
-        });
+      // If we were dragging a connection and hovering over a node's input, create the edge
+      if (pendingConnectionRef.current && hoveredNodeIdRef.current) {
+        onAddEdge(
+          pendingConnectionRef.current.sourceNodeId,
+          hoveredNodeIdRef.current
+        );
       }
       setDragState({ type: null });
       setPendingConnection(null);
-      setHoveredPort(null);
+      setHoveredNodeId(null);
     };
 
     if (dragState.type) {
@@ -199,50 +227,45 @@ export function PipelineCanvas({
     e.preventDefault();
   }, []);
 
-  // Calculate edge path
+  // Calculate edge path between two nodes (side ports)
   const getEdgePath = (edge: PipelineEdge): string => {
     const sourceNode = pipeline.nodes.find((n) => n.id === edge.sourceNodeId);
     const targetNode = pipeline.nodes.find((n) => n.id === edge.targetNodeId);
     if (!sourceNode || !targetNode) return '';
 
-    const sourceOutputIndex = sourceNode.tool.outputs.findIndex(
-      (o) => o.name === edge.sourceOutput
-    );
-    const targetInputIndex = targetNode.tool.inputs.findIndex(
-      (i) => i.name === edge.targetInput
-    );
+    const sourceHeight = getNodeHeight(sourceNode);
+    const targetHeight = getNodeHeight(targetNode);
 
-    // Calculate start and end points
-    const startX = sourceNode.position.x + 180;
-    const startY =
-      sourceNode.position.y +
-      60 +
-      (sourceNode.tool.inputs.length > 0 ? 30 + sourceNode.tool.inputs.length * 20 : 0) +
-      sourceOutputIndex * 20 +
-      10;
+    // Right side of source node (output port), vertically centered
+    const startX = sourceNode.position.x + NODE_WIDTH;
+    const startY = sourceNode.position.y + sourceHeight / 2;
 
+    // Left side of target node (input port), vertically centered
     const endX = targetNode.position.x;
-    const endY = targetNode.position.y + 60 + targetInputIndex * 20 + 10;
+    const endY = targetNode.position.y + targetHeight / 2;
 
-    // Create curved path
-    const midX = (startX + endX) / 2;
-    return `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
+    // Create smooth bezier curve
+    const controlPointOffset = Math.min(Math.abs(endX - startX) / 2, 80);
+    return `M ${startX} ${startY} C ${startX + controlPointOffset} ${startY}, ${endX - controlPointOffset} ${endY}, ${endX} ${endY}`;
   };
 
-  // Get pending connection path
+  // Get pending connection path (during drag)
   const getPendingConnectionPath = (): string => {
     if (!dragState.startPos || !dragState.currentPos || !dragState.nodeId) return '';
 
     const sourceNode = pipeline.nodes.find((n) => n.id === dragState.nodeId);
     if (!sourceNode) return '';
 
-    const startX = dragState.startPos.x;
-    const startY = dragState.startPos.y;
+    const sourceHeight = getNodeHeight(sourceNode);
+
+    // Start from the right side port
+    const startX = sourceNode.position.x + NODE_WIDTH;
+    const startY = sourceNode.position.y + sourceHeight / 2;
     const endX = dragState.currentPos.x;
     const endY = dragState.currentPos.y;
 
-    const midX = (startX + endX) / 2;
-    return `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
+    const controlPointOffset = Math.min(Math.abs(endX - startX) / 2, 80);
+    return `M ${startX} ${startY} C ${startX + controlPointOffset} ${startY}, ${endX - controlPointOffset} ${endY}, ${endX} ${endY}`;
   };
 
   return (
@@ -310,11 +333,13 @@ export function PipelineCanvas({
           isSelected={selectedNodeId === node.id}
           isRunning={executionState.currentNodeId === node.id}
           inputConnections={getNodeInputConnections(node.id)}
+          outputConnections={getNodeOutputConnections(node.id)}
+          isInputPortHovered={hoveredNodeId === node.id && pendingConnection !== null}
           onSelect={onSelectNode}
           onDelete={onDeleteNode}
           onDragStart={handleNodeDragStart}
           onConnectionStart={handleConnectionStart}
-          onInputHover={handleInputHover}
+          onInputPortHover={handleInputPortHover}
         />
       ))}
 

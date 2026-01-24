@@ -1,6 +1,7 @@
 /**
  * Pipeline State Management Hook
- * Manages pipeline nodes, edges, selection, and operations
+ * Manages pipeline nodes, edges, selection, and operations.
+ * Uses simplified connection model with auto-detected primary ports.
  */
 
 import { useState, useCallback, useMemo } from 'react';
@@ -14,6 +15,7 @@ import type {
   PipelineExecutionState,
 } from '../types';
 import { pipelineService } from '../../../services/pipelineService';
+import { getPortConfig, areTypesCompatible } from '../utils/connectionUtils';
 
 function generateId(): string {
   return 'node_' + Math.random().toString(36).substr(2, 9);
@@ -36,8 +38,8 @@ interface UsePipelineReturn {
   selectNode: (nodeId: string | null) => void;
   updateNodeInput: (nodeId: string, inputName: string, value: NodeInputValue) => void;
 
-  // Edge operations
-  addEdge: (edge: Omit<PipelineEdge, 'id'>) => string | null;
+  // Edge operations (simplified - just source and target node IDs)
+  addEdge: (sourceNodeId: string, targetNodeId: string) => string | null;
   removeEdge: (edgeId: string) => void;
   removeEdgesForNode: (nodeId: string) => void;
 
@@ -47,7 +49,7 @@ interface UsePipelineReturn {
   runPipeline: () => Promise<void>;
 
   // Validation
-  canConnect: (sourceNodeId: string, sourceOutput: string, targetNodeId: string, targetInput: string) => boolean;
+  canConnect: (sourceNodeId: string, targetNodeId: string) => boolean;
   getNodeInputConnections: (nodeId: string) => PipelineEdge[];
   getNodeOutputConnections: (nodeId: string) => PipelineEdge[];
 }
@@ -139,76 +141,69 @@ export function usePipeline(): UsePipelineReturn {
     []
   );
 
+  // Simplified canConnect - just checks if source can connect to target
   const canConnect = useCallback(
-    (
-      sourceNodeId: string,
-      sourceOutput: string,
-      targetNodeId: string,
-      targetInput: string
-    ): boolean => {
+    (sourceNodeId: string, targetNodeId: string): boolean => {
       // Can't connect to self
       if (sourceNodeId === targetNodeId) return false;
-
-      // Check if connection already exists
-      const existingEdge = pipeline.edges.find(
-        (e) =>
-          e.targetNodeId === targetNodeId && e.targetInput === targetInput
-      );
-      if (existingEdge) return false;
 
       // Get source and target nodes
       const sourceNode = pipeline.nodes.find((n) => n.id === sourceNodeId);
       const targetNode = pipeline.nodes.find((n) => n.id === targetNodeId);
       if (!sourceNode || !targetNode) return false;
 
-      // Check that the output and input ports exist
-      const output = sourceNode.tool.outputs.find((o) => o.name === sourceOutput);
-      const input = targetNode.tool.inputs.find((i) => i.name === targetInput);
-      if (!output || !input) return false;
+      // Get port configs
+      const sourceConfig = getPortConfig(sourceNode.tool);
+      const targetConfig = getPortConfig(targetNode.tool);
 
-      // Define compatible type groups - types within a group can connect to each other
-      const imageTypes = ['IMAGE', 'MASK', 'ARRAY'];
-      const numericTypes = ['FLOAT', 'INT'];
-      const anyTypes = ['PARAMETERS', 'INSTRUCTIONS']; // These accept anything
+      // Source must have output port, target must have input port
+      if (!sourceConfig.hasOutputPort || !targetConfig.hasInputPort) return false;
+      if (!sourceConfig.primaryOutput || !targetConfig.primaryInput) return false;
+
+      // Check if target's primary input already has a connection
+      const existingEdge = pipeline.edges.find(
+        (e) =>
+          e.targetNodeId === targetNodeId &&
+          e.targetInput === targetConfig.primaryInput?.name
+      );
+      if (existingEdge) return false;
 
       // Check type compatibility
-      const outputType = output.type;
-      const inputType = input.type;
-
-      // Exact match
-      if (outputType === inputType) return true;
-
-      // Input accepts any type
-      if (anyTypes.includes(inputType)) return true;
-
-      // Image-like types are compatible with each other
-      if (imageTypes.includes(outputType) && imageTypes.includes(inputType)) return true;
-
-      // Numeric types are compatible with each other
-      if (numericTypes.includes(outputType) && numericTypes.includes(inputType)) return true;
-
-      // For UI flexibility, allow connections - backend will validate
-      // This makes the visual editor more user-friendly
-      return true;
+      return areTypesCompatible(
+        sourceConfig.primaryOutput.type,
+        targetConfig.primaryInput.type
+      );
     },
     [pipeline.edges, pipeline.nodes]
   );
 
+  // Simplified addEdge - auto-detects primary input/output
   const addEdge = useCallback(
-    (edge: Omit<PipelineEdge, 'id'>): string | null => {
-      if (
-        !canConnect(
-          edge.sourceNodeId,
-          edge.sourceOutput,
-          edge.targetNodeId,
-          edge.targetInput
-        )
-      ) {
+    (sourceNodeId: string, targetNodeId: string): string | null => {
+      // Get source and target nodes
+      const sourceNode = pipeline.nodes.find((n) => n.id === sourceNodeId);
+      const targetNode = pipeline.nodes.find((n) => n.id === targetNodeId);
+      if (!sourceNode || !targetNode) return null;
+
+      // Get port configs to determine primary input/output
+      const sourceConfig = getPortConfig(sourceNode.tool);
+      const targetConfig = getPortConfig(targetNode.tool);
+
+      if (!sourceConfig.primaryOutput || !targetConfig.primaryInput) return null;
+
+      // Validate connection
+      if (!canConnect(sourceNodeId, targetNodeId)) {
         return null;
       }
 
       const edgeId = generateEdgeId();
-      const newEdge: PipelineEdge = { ...edge, id: edgeId };
+      const newEdge: PipelineEdge = {
+        id: edgeId,
+        sourceNodeId,
+        sourceOutput: sourceConfig.primaryOutput.name,
+        targetNodeId,
+        targetInput: targetConfig.primaryInput.name,
+      };
 
       setPipeline((prev) => ({
         ...prev,
@@ -216,15 +211,15 @@ export function usePipeline(): UsePipelineReturn {
       }));
 
       // Update target node input to use connection
-      updateNodeInput(edge.targetNodeId, edge.targetInput, {
+      updateNodeInput(targetNodeId, targetConfig.primaryInput.name, {
         type: 'connection',
-        sourceNodeId: edge.sourceNodeId,
-        sourceOutput: edge.sourceOutput,
+        sourceNodeId,
+        sourceOutput: sourceConfig.primaryOutput.name,
       });
 
       return edgeId;
     },
-    [canConnect, updateNodeInput]
+    [canConnect, updateNodeInput, pipeline.nodes]
   );
 
   const removeEdge = useCallback((edgeId: string) => {

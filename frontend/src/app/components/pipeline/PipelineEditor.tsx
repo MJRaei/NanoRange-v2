@@ -34,6 +34,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
     setPipelineName,
     runPipeline,
     getNodeInputConnections,
+    getNodeOutputConnections,
   } = usePipeline();
 
   const [leftPanelWidth, setLeftPanelWidth] = useState(200);
@@ -148,6 +149,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
             onAddEdge={addEdge}
             onDropTool={handleDropTool}
             getNodeInputConnections={getNodeInputConnections}
+            getNodeOutputConnections={getNodeOutputConnections}
           />
         </div>
 
@@ -202,6 +204,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
               <div className="flex-1 overflow-hidden">
                 <ParameterPanel
                   node={selectedNode}
+                  inputConnections={selectedNodeId ? getNodeInputConnections(selectedNodeId) : []}
                   onUpdateInput={updateNodeInput}
                   onDeleteNode={removeNode}
                 />

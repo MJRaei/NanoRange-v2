@@ -2,14 +2,18 @@
 
 /**
  * ParameterPanel Component
- * Displays and allows editing of parameters for the selected node
+ * Displays and allows editing of parameters for the selected node.
+ * Connectable inputs (IMAGE/MASK) are shown as connection status.
+ * Other inputs are editable via form fields.
  */
 
 import React, { useCallback } from 'react';
-import type { PipelineNode, NodeInputValue, DataType } from './types';
+import type { PipelineNode, NodeInputValue, DataType, PipelineEdge } from './types';
+import { isConnectableType, getInputSatisfactionStatus } from './utils/connectionUtils';
 
 interface ParameterPanelProps {
   node: PipelineNode | null;
+  inputConnections: PipelineEdge[];
   onUpdateInput: (nodeId: string, inputName: string, value: NodeInputValue) => void;
   onDeleteNode: (nodeId: string) => void;
 }
@@ -111,7 +115,7 @@ function InputField({
   }
 }
 
-export function ParameterPanel({ node, onUpdateInput, onDeleteNode }: ParameterPanelProps) {
+export function ParameterPanel({ node, inputConnections, onUpdateInput, onDeleteNode }: ParameterPanelProps) {
   const handleInputChange = useCallback(
     (inputName: string, value: NodeInputValue) => {
       if (node) {
@@ -156,6 +160,10 @@ export function ParameterPanel({ node, onUpdateInput, onDeleteNode }: ParameterP
     );
   }
 
+  // Separate connectable inputs from editable inputs
+  const connectableInputs = node.tool.inputs.filter(input => isConnectableType(input.type));
+  const editableInputs = node.tool.inputs.filter(input => !isConnectableType(input.type));
+
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: '#111' }}>
       {/* Header */}
@@ -186,9 +194,62 @@ export function ParameterPanel({ node, onUpdateInput, onDeleteNode }: ParameterP
 
       {/* Parameters */}
       <div className="flex-1 overflow-y-auto p-3">
-        {node.tool.inputs.length > 0 ? (
+        {/* Connectable inputs (IMAGE/MASK) - shown as connection status */}
+        {connectableInputs.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">
+              Connections
+            </h4>
+            <div className="space-y-2">
+              {connectableInputs.map((input) => {
+                const currentValue = node.inputs[input.name];
+                const isConnected = currentValue?.type === 'connection';
+                const status = getInputSatisfactionStatus(
+                  input,
+                  currentValue,
+                  inputConnections,
+                  input.name
+                );
+
+                return (
+                  <div key={input.name} className="space-y-1">
+                    <label className="block text-xs font-medium text-gray-300">
+                      {input.name}
+                      {input.required && <span className="text-red-400 ml-0.5">*</span>}
+                      <span className="text-[10px] text-gray-600 ml-2">{input.type}</span>
+                    </label>
+                    {isConnected ? (
+                      <div className="px-3 py-2 rounded text-xs bg-green-900/20 border border-green-500/30">
+                        <span className="text-green-400">Connected</span>
+                        <span className="text-gray-500 ml-1">
+                          from {currentValue?.sourceNodeId}.{currentValue?.sourceOutput}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className={`px-3 py-2 rounded text-xs border border-dashed ${
+                        status === 'unsatisfied'
+                          ? 'bg-red-900/10 border-red-500/30 text-red-400'
+                          : 'bg-black/20 border-gray-600 text-gray-500'
+                      }`}>
+                        Not connected - drag from another node&apos;s output port
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Editable inputs */}
+        {editableInputs.length > 0 ? (
           <div className="space-y-4">
-            {node.tool.inputs.map((input) => {
+            {connectableInputs.length > 0 && (
+              <h4 className="text-[10px] text-gray-500 uppercase tracking-wider">
+                Parameters
+              </h4>
+            )}
+            {editableInputs.map((input) => {
               const currentValue = node.inputs[input.name];
               const isConnected = currentValue?.type === 'connection';
 
@@ -197,6 +258,11 @@ export function ParameterPanel({ node, onUpdateInput, onDeleteNode }: ParameterP
                   <label className="block text-xs font-medium text-gray-300 mb-1.5">
                     {input.name}
                     {input.required && <span className="text-red-400 ml-0.5">*</span>}
+                    {input.default !== undefined && (
+                      <span className="text-gray-600 ml-2 text-[10px]">
+                        (default: {String(input.default)})
+                      </span>
+                    )}
                   </label>
                   <InputField
                     name={input.name}
@@ -213,11 +279,11 @@ export function ParameterPanel({ node, onUpdateInput, onDeleteNode }: ParameterP
               );
             })}
           </div>
-        ) : (
+        ) : connectableInputs.length === 0 ? (
           <p className="text-xs text-gray-500 text-center py-4">
             This tool has no configurable parameters
           </p>
-        )}
+        ) : null}
       </div>
 
       {/* Outputs info */}

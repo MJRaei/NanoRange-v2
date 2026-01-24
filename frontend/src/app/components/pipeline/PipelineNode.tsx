@@ -2,22 +2,32 @@
 
 /**
  * PipelineNode Component
- * Renders a single tool node in the pipeline canvas
+ * Renders a single tool node in the pipeline canvas with simplified side ports
+ * for image/mask connections.
  */
 
-import { useCallback, MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useMemo, MouseEvent as ReactMouseEvent } from 'react';
+import { NodePort } from './NodePort';
 import type { PipelineNode as PipelineNodeType, PipelineEdge } from './types';
+import {
+  getPortConfig,
+  getInputSatisfactionStatus,
+  isConnectableType,
+  type SatisfactionStatus,
+} from './utils/connectionUtils';
 
 interface PipelineNodeProps {
   node: PipelineNodeType;
   isSelected: boolean;
   isRunning?: boolean;
   inputConnections: PipelineEdge[];
+  outputConnections: PipelineEdge[];
+  isInputPortHovered?: boolean;
   onSelect: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onDragStart: (nodeId: string, e: ReactMouseEvent) => void;
-  onConnectionStart: (nodeId: string, outputName: string, e: ReactMouseEvent) => void;
-  onInputHover: (nodeId: string | null, inputName: string | null) => void;
+  onConnectionStart: (nodeId: string, e: ReactMouseEvent) => void;
+  onInputPortHover: (nodeId: string | null) => void;
 }
 
 const categoryColors: Record<string, string> = {
@@ -30,18 +40,48 @@ const categoryColors: Record<string, string> = {
   default: '#6b7280',
 };
 
+function SatisfactionIndicator({ status }: { status: SatisfactionStatus }) {
+  const colors = {
+    satisfied: 'bg-green-500',
+    unsatisfied: 'bg-red-500',
+    optional: 'bg-gray-500',
+  };
+
+  return (
+    <div
+      className={`w-1.5 h-1.5 rounded-full ${colors[status]}`}
+      title={status === 'satisfied' ? 'Has value' : status === 'unsatisfied' ? 'Required' : 'Optional'}
+    />
+  );
+}
+
 export function PipelineNode({
   node,
   isSelected,
   isRunning,
   inputConnections,
+  outputConnections,
+  isInputPortHovered,
   onSelect,
   onDelete,
   onDragStart,
   onConnectionStart,
-  onInputHover,
+  onInputPortHover,
 }: PipelineNodeProps) {
   const categoryColor = categoryColors[node.tool.category] || categoryColors.default;
+  const portConfig = useMemo(() => getPortConfig(node.tool), [node.tool]);
+
+  // Check if the primary input is connected
+  const isPrimaryInputConnected = useMemo(() => {
+    if (!portConfig.primaryInput) return false;
+    return inputConnections.some(e => e.targetInput === portConfig.primaryInput?.name);
+  }, [portConfig.primaryInput, inputConnections]);
+
+  // Check if the primary output is connected
+  const isPrimaryOutputConnected = useMemo(() => {
+    if (!portConfig.primaryOutput) return false;
+    return outputConnections.some(e => e.sourceOutput === portConfig.primaryOutput?.name);
+  }, [portConfig.primaryOutput, outputConnections]);
 
   const handleMouseDown = useCallback(
     (e: ReactMouseEvent) => {
@@ -61,21 +101,43 @@ export function PipelineNode({
     [node.id, onDelete]
   );
 
-  const handleOutputMouseDown = useCallback(
-    (outputName: string, e: ReactMouseEvent) => {
+  const handleOutputPortMouseDown = useCallback(
+    (e: ReactMouseEvent) => {
       e.stopPropagation();
-      onConnectionStart(node.id, outputName, e);
+      onConnectionStart(node.id, e);
     },
     [node.id, onConnectionStart]
   );
 
-  const isInputConnected = (inputName: string): boolean => {
-    return inputConnections.some((e) => e.targetInput === inputName);
-  };
+  const handleInputPortEnter = useCallback(() => {
+    onInputPortHover(node.id);
+  }, [node.id, onInputPortHover]);
+
+  const handleInputPortLeave = useCallback(() => {
+    onInputPortHover(null);
+  }, [onInputPortHover]);
+
+  // Get satisfaction status for each input
+  const getStatus = useCallback(
+    (inputName: string) => {
+      const input = node.tool.inputs.find(i => i.name === inputName);
+      if (!input) return 'optional' as SatisfactionStatus;
+      return getInputSatisfactionStatus(
+        input,
+        node.inputs[inputName],
+        inputConnections,
+        inputName
+      );
+    },
+    [node.tool.inputs, node.inputs, inputConnections]
+  );
+
+  // Filter inputs: non-connectable inputs are shown in the node
+  const displayInputs = node.tool.inputs.filter(input => !isConnectableType(input.type));
 
   return (
     <div
-      className="absolute select-none"
+      className="absolute select-none group"
       style={{
         left: node.position.x,
         top: node.position.y,
@@ -95,6 +157,26 @@ export function PipelineNode({
           boxShadow: isSelected ? `0 0 0 2px ${categoryColor}40` : undefined,
         }}
       >
+        {/* Left Port (Input) - positioned on the border */}
+        {portConfig.hasInputPort && portConfig.primaryInput && (
+          <NodePort
+            side="left"
+            isConnected={isPrimaryInputConnected}
+            isHovered={isInputPortHovered}
+            onMouseEnter={handleInputPortEnter}
+            onMouseLeave={handleInputPortLeave}
+          />
+        )}
+
+        {/* Right Port (Output) - positioned on the border */}
+        {portConfig.hasOutputPort && portConfig.primaryOutput && (
+          <NodePort
+            side="right"
+            isConnected={isPrimaryOutputConnected}
+            onMouseDown={handleOutputPortMouseDown}
+          />
+        )}
+
         {/* Header */}
         <div
           className="px-3 py-2 rounded-t-md flex items-center justify-between"
@@ -130,30 +212,35 @@ export function PipelineNode({
           <h3 className="text-sm font-semibold text-white">{node.tool.name}</h3>
         </div>
 
-        {/* Inputs */}
-        {node.tool.inputs.length > 0 && (
+        {/* Connectable input status (if has input port) */}
+        {portConfig.hasInputPort && portConfig.primaryInput && (
+          <div className="px-3 py-1.5 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <SatisfactionIndicator status={getStatus(portConfig.primaryInput.name)} />
+              <span className="text-xs text-gray-400">
+                {portConfig.primaryInput.name}
+              </span>
+              <span className="text-[10px] text-gray-600 ml-auto">
+                {isPrimaryInputConnected ? 'connected' : 'not connected'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Other Inputs (non-connectable) */}
+        {displayInputs.length > 0 && (
           <div className="px-3 py-2 space-y-1">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider">
-              Inputs
+              Parameters
             </span>
-            {node.tool.inputs.map((input) => (
+            {displayInputs.map((input) => (
               <div
                 key={input.name}
-                className="flex items-center gap-2 group"
+                className="flex items-center gap-2"
               >
-                <div
-                  className={`
-                    w-3 h-3 rounded-full border-2 transition-all cursor-pointer
-                    ${isInputConnected(input.name)
-                      ? 'bg-green-500 border-green-400'
-                      : 'bg-transparent border-gray-500 group-hover:border-gray-300'}
-                  `}
-                  onMouseEnter={() => onInputHover(node.id, input.name)}
-                  onMouseLeave={() => onInputHover(null, null)}
-                />
+                <SatisfactionIndicator status={getStatus(input.name)} />
                 <span className="text-xs text-gray-400">
                   {input.name}
-                  {input.required && <span className="text-red-400 ml-0.5">*</span>}
                 </span>
                 <span className="text-[10px] text-gray-600 ml-auto">
                   {input.type}
@@ -163,7 +250,7 @@ export function PipelineNode({
           </div>
         )}
 
-        {/* Outputs */}
+        {/* Outputs (no circles, just info) */}
         {node.tool.outputs.length > 0 && (
           <div className="px-3 py-2 space-y-1 border-t border-white/5">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider">
@@ -172,19 +259,12 @@ export function PipelineNode({
             {node.tool.outputs.map((output) => (
               <div
                 key={output.name}
-                className="flex items-center gap-2 group justify-end"
+                className="flex items-center gap-2 justify-end"
               >
                 <span className="text-[10px] text-gray-600">
                   {output.type}
                 </span>
                 <span className="text-xs text-gray-400">{output.name}</span>
-                <div
-                  className={`
-                    w-3 h-3 rounded-full border-2 transition-all cursor-pointer
-                    bg-transparent border-gray-500 group-hover:border-gray-300 group-hover:bg-gray-500
-                  `}
-                  onMouseDown={(e) => handleOutputMouseDown(output.name, e)}
-                />
               </div>
             ))}
           </div>
