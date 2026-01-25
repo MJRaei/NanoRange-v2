@@ -13,6 +13,7 @@ import type {
   Position,
   NodeInputValue,
   PipelineExecutionState,
+  NodeExecutionResult,
 } from '../types';
 import { pipelineService } from '../../../services/pipelineService';
 import { getPortConfig, areTypesCompatible } from '../utils/connectionUtils';
@@ -48,6 +49,17 @@ interface UsePipelineReturn {
   setPipelineName: (name: string) => void;
   runPipeline: () => Promise<void>;
   loadPipeline: (pipelineData: Pipeline) => void;
+  setExecutionResults: (executionResult: {
+    status: string;
+    step_results?: Array<{
+      step_id?: string;
+      node_id?: string;
+      step_name: string;
+      status: string;
+      outputs?: Record<string, unknown>;
+      error?: string;
+    }>;
+  }) => void;
 
   // Validation
   canConnect: (sourceNodeId: string, targetNodeId: string) => boolean;
@@ -277,6 +289,47 @@ export function usePipeline(): UsePipelineReturn {
     setExecutionState({ status: 'idle' });
   }, []);
 
+  // Set execution results from external source (e.g., agent execution)
+  const setExecutionResults = useCallback((executionResult: {
+    status: string;
+    step_results?: Array<{
+      step_id?: string;
+      node_id?: string;
+      step_name: string;
+      status: string;
+      outputs?: Record<string, unknown>;
+      error?: string;
+    }>;
+  }) => {
+    const frontendStatus =
+      executionResult.status === 'completed' ? 'success' :
+      executionResult.status === 'failed' ? 'error' :
+      'idle';
+
+    // Build nodeResults map from step_results
+    const nodeResults: Record<string, NodeExecutionResult> = {};
+    if (executionResult.step_results) {
+      for (const stepResult of executionResult.step_results) {
+        // Use node_id if available (from agent), otherwise fall back to step_id
+        const nodeId = stepResult.node_id || stepResult.step_id || '';
+        if (nodeId) {
+          nodeResults[nodeId] = {
+            stepId: stepResult.step_id || nodeId,
+            stepName: stepResult.step_name,
+            status: stepResult.status as 'pending' | 'running' | 'completed' | 'failed',
+            outputs: stepResult.outputs || {},
+            errorMessage: stepResult.error,
+          };
+        }
+      }
+    }
+
+    setExecutionState({
+      status: frontendStatus as 'idle' | 'running' | 'success' | 'error',
+      nodeResults,
+    });
+  }, []);
+
   const runPipeline = useCallback(async () => {
     setExecutionState({ status: 'running' });
 
@@ -295,10 +348,25 @@ export function usePipeline(): UsePipelineReturn {
             status.status === 'failed' ? 'error' :
             'running';
 
+          // Build nodeResults map from step_results
+          const nodeResults: Record<string, NodeExecutionResult> = {};
+          if (status.result?.step_results) {
+            for (const stepResult of status.result.step_results) {
+              nodeResults[stepResult.step_id] = {
+                stepId: stepResult.step_id,
+                stepName: stepResult.step_name,
+                status: stepResult.status as 'pending' | 'running' | 'completed' | 'failed',
+                outputs: stepResult.outputs || {},
+                errorMessage: stepResult.error_message,
+              };
+            }
+          }
+
           setExecutionState({
             status: frontendStatus as 'idle' | 'running' | 'success' | 'error',
             currentNodeId: status.current_step,
             results: status.result?.final_outputs,
+            nodeResults,
             error: status.error,
           });
 
@@ -341,6 +409,7 @@ export function usePipeline(): UsePipelineReturn {
     setPipelineName,
     runPipeline,
     loadPipeline,
+    setExecutionResults,
     canConnect,
     getNodeInputConnections,
     getNodeOutputConnections,

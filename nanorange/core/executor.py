@@ -231,11 +231,12 @@ class PipelineExecutor:
                 outputs = {"result": outputs}
             
             step_dir_name = self._get_step_dir_name(step)
-            
+
+            # Copy outputs to session folder and update output paths
             if step.tool_id == "load_image" and "image_path" in resolved_inputs:
                 try:
                     source_path = resolved_inputs["image_path"]
-                    self.file_store.save_file(
+                    session_path = self.file_store.save_file(
                         source_path=source_path,
                         session_id=self.session_id,
                         pipeline_id=context.pipeline.pipeline_id,
@@ -243,13 +244,16 @@ class PipelineExecutor:
                         output_name="input",
                         copy=True
                     )
+                    # Update the output to use the session path
+                    if "image" in outputs:
+                        outputs["image"] = session_path
                 except Exception as e:
                     print(f"Warning: Failed to copy load_image input to session: {e}")
 
             elif step.tool_id == "save_image" and "saved_path" in outputs:
                 try:
                     saved_path = outputs["saved_path"]
-                    self.file_store.save_file(
+                    session_path = self.file_store.save_file(
                         source_path=saved_path,
                         session_id=self.session_id,
                         pipeline_id=context.pipeline.pipeline_id,
@@ -257,6 +261,8 @@ class PipelineExecutor:
                         output_name="output",
                         copy=True
                     )
+                    # Update the output to use the session path
+                    outputs["saved_path"] = session_path
                 except Exception as e:
                     print(f"Warning: Failed to copy save_image output to session: {e}")
 

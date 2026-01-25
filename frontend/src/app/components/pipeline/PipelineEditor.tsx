@@ -206,6 +206,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
                 <ParameterPanel
                   node={selectedNode}
                   inputConnections={selectedNodeId ? getNodeInputConnections(selectedNodeId) : []}
+                  executionState={executionState}
                   onUpdateInput={updateNodeInput}
                   onDeleteNode={removeNode}
                 />

@@ -7,13 +7,16 @@
  * Other inputs are editable via form fields.
  */
 
-import React, { useCallback } from 'react';
-import type { PipelineNode, NodeInputValue, DataType, PipelineEdge } from './types';
+import React, { useCallback, useState } from 'react';
+import type { PipelineNode, NodeInputValue, DataType, PipelineEdge, PipelineExecutionState } from './types';
 import { isConnectableType, getInputSatisfactionStatus } from './utils/connectionUtils';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface ParameterPanelProps {
   node: PipelineNode | null;
   inputConnections: PipelineEdge[];
+  executionState: PipelineExecutionState;
   onUpdateInput: (nodeId: string, inputName: string, value: NodeInputValue) => void;
   onDeleteNode: (nodeId: string) => void;
 }
@@ -115,7 +118,68 @@ function InputField({
   }
 }
 
-export function ParameterPanel({ node, inputConnections, onUpdateInput, onDeleteNode }: ParameterPanelProps) {
+/**
+ * Helper to convert a file path to a static URL
+ *
+ * Backend mounts:
+ *   /static/data → data/files directory
+ *   /static/uploads → uploads directory
+ *
+ * So paths like:
+ *   data/files/sessions/... → /static/data/sessions/...
+ *   /absolute/path/data/files/sessions/... → /static/data/sessions/...
+ *   uploads/... → /static/uploads/...
+ */
+function getStaticUrl(filePath: string): string {
+  // If it's already a URL, return as-is
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    return filePath;
+  }
+
+  // Handle paths containing data/files/ (both absolute and relative)
+  // e.g., "data/files/sessions/..." or "/abs/path/data/files/sessions/..."
+  const dataFilesMatch = filePath.match(/data\/files\/(.+)/);
+  if (dataFilesMatch) {
+    return `${API_BASE}/static/data/${dataFilesMatch[1]}`;
+  }
+
+  // Handle uploads paths (both absolute and relative)
+  const uploadsMatch = filePath.match(/uploads\/(.+)/);
+  if (uploadsMatch) {
+    return `${API_BASE}/static/uploads/${uploadsMatch[1]}`;
+  }
+
+  // If it's an absolute path that doesn't match our patterns, log warning
+  if (filePath.startsWith('/')) {
+    console.warn('[getStaticUrl] Unhandled absolute path:', filePath);
+    // Try to extract just the filename and serve from static/data
+    const filename = filePath.split('/').pop();
+    return `${API_BASE}/static/data/${filename}`;
+  }
+
+  // Handle relative paths starting with data/
+  if (filePath.startsWith('data/')) {
+    const relativePath = filePath.replace(/^data\//, '');
+    return `${API_BASE}/static/data/${relativePath}`;
+  }
+
+  // Fallback: serve from static/data
+  return `${API_BASE}/static/data/${filePath}`;
+}
+
+/**
+ * Check if a value looks like an image path
+ */
+function isImagePath(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const lower = value.toLowerCase();
+  return lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') ||
+         lower.endsWith('.tiff') || lower.endsWith('.tif') || lower.endsWith('.bmp');
+}
+
+export function ParameterPanel({ node, inputConnections, executionState, onUpdateInput, onDeleteNode }: ParameterPanelProps) {
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
+
   const handleInputChange = useCallback(
     (inputName: string, value: NodeInputValue) => {
       if (node) {
@@ -124,6 +188,9 @@ export function ParameterPanel({ node, inputConnections, onUpdateInput, onDelete
     },
     [node, onUpdateInput]
   );
+
+  // Get execution result for this node
+  const nodeResult = node ? executionState.nodeResults?.[node.id] : null;
 
   if (!node) {
     return (
@@ -290,13 +357,81 @@ export function ParameterPanel({ node, inputConnections, onUpdateInput, onDelete
       {node.tool.outputs.length > 0 && (
         <div className="p-3 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
           <h4 className="text-xs font-medium text-gray-400 mb-2">Outputs</h4>
-          <div className="space-y-1">
-            {node.tool.outputs.map((output) => (
-              <div key={output.name} className="flex items-center justify-between text-xs">
-                <span className="text-gray-300">{output.name}</span>
-                <span className="text-gray-600">{output.type}</span>
-              </div>
-            ))}
+          <div className="space-y-2">
+            {node.tool.outputs.map((output) => {
+              const outputValue = nodeResult?.outputs?.[output.name];
+              const hasImageOutput = isImagePath(outputValue);
+
+              return (
+                <div key={output.name} className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-300">{output.name}</span>
+                    <span className="text-gray-600">{output.type}</span>
+                  </div>
+
+                  {/* Show output image if available */}
+                  {hasImageOutput && (
+                    <div className="relative group">
+                      <img
+                        src={getStaticUrl(outputValue)}
+                        alt={`${output.name} output`}
+                        className="w-full rounded border border-gray-700 cursor-pointer hover:border-orange-500/50 transition-colors"
+                        onClick={() => setExpandedImage(getStaticUrl(outputValue))}
+                      />
+                      <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => setExpandedImage(getStaticUrl(outputValue))}
+                          className="p-1 bg-black/70 rounded text-gray-300 hover:text-white"
+                          title="Expand image"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show completion status */}
+                  {nodeResult && !hasImageOutput && (
+                    <div className={`text-[10px] px-2 py-1 rounded ${
+                      nodeResult.status === 'completed' ? 'bg-green-900/20 text-green-400' :
+                      nodeResult.status === 'failed' ? 'bg-red-900/20 text-red-400' :
+                      nodeResult.status === 'running' ? 'bg-yellow-900/20 text-yellow-400' :
+                      'bg-gray-900/20 text-gray-500'
+                    }`}>
+                      {nodeResult.status === 'completed' && outputValue !== undefined
+                        ? `Value: ${typeof outputValue === 'string' ? outputValue : JSON.stringify(outputValue)}`
+                        : nodeResult.status}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Expanded image modal */}
+      {expandedImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setExpandedImage(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <img
+              src={expandedImage}
+              alt="Expanded output"
+              className="max-w-full max-h-[90vh] object-contain rounded"
+            />
+            <button
+              onClick={() => setExpandedImage(null)}
+              className="absolute top-2 right-2 p-2 bg-black/70 rounded-full text-white hover:bg-black/90 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}

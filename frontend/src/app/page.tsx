@@ -67,7 +67,7 @@ function ChatView() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Get pipeline context for loading agent-built pipelines
-  const { loadPipeline } = usePipelineContext();
+  const { loadPipeline, setExecutionResults } = usePipelineContext();
 
   // Handle resize drag
   const handleMouseDown = useCallback(() => {
@@ -175,6 +175,11 @@ function ChatView() {
         if (!showPipeline) {
           setShowPipeline(true);
         }
+      }
+
+      // If agent executed the pipeline, update the execution results
+      if (result.execution_result) {
+        setExecutionResults(result.execution_result);
       }
 
       // Prepare images for display in chat

@@ -32,6 +32,26 @@ export interface AnalysisImages {
   size_distribution_html?: string;
 }
 
+// Execution result from agent pipeline execution
+export interface AgentExecutionResult {
+  status: string;
+  pipeline_name?: string;
+  total_steps?: number;
+  completed_steps?: number;
+  failed_steps?: number;
+  total_duration_seconds?: number;
+  step_results?: Array<{
+    step_id?: string;
+    node_id?: string;
+    step_name: string;
+    tool_id?: string;
+    status: string;
+    duration_seconds?: number;
+    outputs?: Record<string, unknown>;
+    error?: string;
+  }>;
+}
+
 export interface AnalysisResult {
   success: boolean;
   message: string;
@@ -39,6 +59,7 @@ export interface AnalysisResult {
   csv_path: string | null;
   session_id: string;
   pipeline?: AgentPipeline | null;  // Pipeline built by the agent
+  execution_result?: AgentExecutionResult | null;  // Execution results from agent
 }
 
 // Pipeline structure from agent (matches backend format)

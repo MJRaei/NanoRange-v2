@@ -41,6 +41,17 @@ interface PipelineContextValue {
   setPipelineName: (name: string) => void;
   runPipeline: () => Promise<void>;
   loadPipeline: (pipelineData: Pipeline) => void;
+  setExecutionResults: (executionResult: {
+    status: string;
+    step_results?: Array<{
+      step_id?: string;
+      node_id?: string;
+      step_name: string;
+      status: string;
+      outputs?: Record<string, unknown>;
+      error?: string;
+    }>;
+  }) => void;
 
   // Validation
   canConnect: (sourceNodeId: string, targetNodeId: string) => boolean;

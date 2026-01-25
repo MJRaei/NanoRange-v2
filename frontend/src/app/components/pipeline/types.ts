@@ -98,9 +98,18 @@ export interface CanvasState {
 
 export type PipelineStatus = 'idle' | 'running' | 'success' | 'error';
 
+export interface NodeExecutionResult {
+  stepId: string;
+  stepName: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  outputs: Record<string, unknown>;
+  errorMessage?: string;
+}
+
 export interface PipelineExecutionState {
   status: PipelineStatus;
   currentNodeId?: string;
   results?: Record<string, unknown>;
+  nodeResults?: Record<string, NodeExecutionResult>;
   error?: string;
 }

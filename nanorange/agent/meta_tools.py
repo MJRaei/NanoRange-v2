@@ -24,6 +24,7 @@ _current_session: Optional[SessionManager] = None
 _current_executor: Optional[PipelineExecutor] = None
 _current_adaptive_executor: Optional[AdaptiveExecutor] = None
 _last_refinement_report: Optional[RefinementReport] = None
+_last_execution_result: Optional[Dict[str, Any]] = None
 _session_image_path: Optional[str] = None
 
 
@@ -518,10 +519,14 @@ def execute_pipeline(
     session = _get_session()
     session.save_pipeline(manager.current_pipeline)
     session.save_result(result)
-    
+
     step_summaries = []
     for sr in result.step_results:
+        # Use node_id format to match frontend node IDs
+        node_id = f"node_{sr.step_id}"
         step_summaries.append({
+            "step_id": sr.step_id,
+            "node_id": node_id,  # Frontend uses this format
             "step_name": sr.step_name,
             "tool_id": sr.tool_id,
             "status": sr.status.value,
@@ -529,8 +534,10 @@ def execute_pipeline(
             "outputs": sr.outputs,
             "error": sr.error_message,
         })
-    
-    return {
+
+    # Store the last execution result for retrieval by chat API
+    global _last_execution_result
+    _last_execution_result = {
         "status": result.status.value,
         "pipeline_name": result.pipeline_name,
         "total_steps": result.total_steps,
@@ -539,6 +546,8 @@ def execute_pipeline(
         "total_duration_seconds": result.total_duration_seconds,
         "step_results": step_summaries,
     }
+
+    return _last_execution_result
 
 
 def execute_pipeline_adaptive(
@@ -1111,3 +1120,18 @@ def has_current_pipeline() -> bool:
     """Check if there's an active pipeline."""
     manager = _get_manager()
     return manager.current_pipeline is not None and len(manager.current_pipeline.steps) > 0
+
+
+def get_last_execution_result() -> Optional[Dict[str, Any]]:
+    """
+    Get the last pipeline execution result.
+
+    Returns:
+        Execution result dict with step_results, or None if no execution has occurred
+    """
+    return _last_execution_result
+
+
+def has_execution_result() -> bool:
+    """Check if there's a stored execution result."""
+    return _last_execution_result is not None
