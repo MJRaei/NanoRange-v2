@@ -57,7 +57,7 @@ function ChatView() {
   const [attachedImagePreview, setAttachedImagePreview] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showPipeline, setShowPipeline] = useState(true);
-  const [splitPosition, setSplitPosition] = useState(50); // percentage
+  const [splitPosition, setSplitPosition] = useState(30); // percentage
   const [isResizing, setIsResizing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
