@@ -10,6 +10,7 @@ export { ToolPalette } from './ToolPalette';
 export { ParameterPanel } from './ParameterPanel';
 export { PipelineToolbar } from './PipelineToolbar';
 export { usePipeline } from './hooks/usePipeline';
+export { PipelineProvider, usePipelineContext } from './PipelineContext';
 
 export type {
   DataType,

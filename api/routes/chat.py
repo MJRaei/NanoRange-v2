@@ -11,6 +11,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 
 from nanorange.agent.orchestrator import NanoRangeOrchestrator
+from nanorange.agent.meta_tools import get_current_pipeline_for_frontend, has_current_pipeline
 from nanorange.storage.file_store import FileStore
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -37,6 +38,7 @@ class AnalysisResult(BaseModel):
     images: dict = {}
     csv_path: Optional[str] = None
     session_id: str
+    pipeline: Optional[dict] = None  # Frontend-compatible pipeline if one was built
 
 
 def ensure_directories():
@@ -192,18 +194,24 @@ async def analyze_endpoint(
             message=message,
             image_path=image_path
         )
-        
+
         images = collect_output_images(session_id)
         csv_path = get_csv_path(session_id)
-        
+
+        # Get pipeline if one was built by the agent
+        pipeline_data = None
+        if has_current_pipeline():
+            pipeline_data = get_current_pipeline_for_frontend()
+
         return AnalysisResult(
             success=True,
             message=agent_response,
             images=images,
             csv_path=csv_path,
-            session_id=session_id
+            session_id=session_id,
+            pipeline=pipeline_data
         )
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()

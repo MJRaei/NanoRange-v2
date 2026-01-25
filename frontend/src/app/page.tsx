@@ -14,7 +14,10 @@ import {
   analyzeImage,
   checkHealth,
   PipelineEditor,
+  PipelineProvider,
+  usePipelineContext,
 } from "./components";
+import type { Pipeline } from "./components";
 
 // UUID generator that works in all browsers
 function generateId(): string {
@@ -62,6 +65,9 @@ function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Get pipeline context for loading agent-built pipelines
+  const { loadPipeline } = usePipelineContext();
 
   // Handle resize drag
   const handleMouseDown = useCallback(() => {
@@ -158,6 +164,17 @@ function ChatView() {
       // Store session_id for subsequent messages
       if (result.session_id && !sessionId) {
         setSessionId(result.session_id);
+      }
+
+      // If agent built a pipeline, load it into the visual editor
+      if (result.pipeline) {
+        // Convert AgentPipeline to Pipeline format (they should be compatible)
+        const pipelineData = result.pipeline as unknown as Pipeline;
+        loadPipeline(pipelineData);
+        // Auto-show the pipeline panel when agent builds one
+        if (!showPipeline) {
+          setShowPipeline(true);
+        }
       }
 
       // Prepare images for display in chat
@@ -451,7 +468,13 @@ export default function Home() {
   }, []);
 
   if (showChat) {
-    return <ChatView />;
+    // Wrap ChatView with PipelineProvider so pipeline state is shared
+    // between the chat and the visual pipeline editor
+    return (
+      <PipelineProvider>
+        <ChatView />
+      </PipelineProvider>
+    );
   }
 
   return (

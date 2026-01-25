@@ -10,7 +10,7 @@ These tools are used by the orchestrator agent to:
 """
 
 from typing import Any, Dict, List, Optional
-from nanorange.core.schemas import Pipeline, PipelineStep, StepInput
+from nanorange.core.schemas import Pipeline, PipelineStep, StepInput, InputSource
 from nanorange.core.registry import get_registry
 from nanorange.core.pipeline import PipelineManager
 from nanorange.core.executor import PipelineExecutor
@@ -951,15 +951,15 @@ def export_pipeline() -> str:
 def import_pipeline(json_str: str) -> Dict[str, Any]:
     """
     Import a pipeline from JSON.
-    
+
     Args:
         json_str: JSON pipeline definition
-        
+
     Returns:
         Import status
     """
     global _current_manager
-    
+
     try:
         _current_manager = PipelineManager.from_json(json_str)
         pipeline = _current_manager.current_pipeline
@@ -971,3 +971,137 @@ def import_pipeline(json_str: str) -> Dict[str, Any]:
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def get_current_pipeline_for_frontend() -> Optional[Dict[str, Any]]:
+    """
+    Get the current pipeline in frontend-compatible format.
+
+    This converts the backend Pipeline structure to the format expected
+    by the frontend visual pipeline editor.
+
+    Returns:
+        Pipeline in frontend format, or None if no pipeline exists
+    """
+    manager = _get_manager()
+
+    if not manager.current_pipeline:
+        return None
+
+    pipeline = manager.current_pipeline
+    registry = get_registry()
+
+    nodes = []
+    step_id_to_node_id = {}
+
+    x_position = 250
+    y_position = 50
+    y_spacing = 180
+
+    for idx, step in enumerate(pipeline.steps):
+        node_id = f"node_{step.step_id}"
+        step_id_to_node_id[step.step_id] = node_id
+
+        schema = registry.get_schema(step.tool_id)
+        if not schema:
+            continue
+
+        def build_input_def(inp):
+            """Build input definition with optional constraints."""
+            input_def = {
+                "name": inp.name,
+                "type": inp.type.value.upper(),
+                "description": inp.description or "",
+                "required": inp.required,
+                "default": inp.default,
+            }
+            constraints = {}
+            if inp.min_value is not None:
+                constraints["min_value"] = inp.min_value
+            if inp.max_value is not None:
+                constraints["max_value"] = inp.max_value
+            if inp.choices is not None:
+                constraints["choices"] = inp.choices
+            if constraints:
+                input_def["constraints"] = constraints
+            return input_def
+
+        tool_def = {
+            "id": schema.tool_id,
+            "name": schema.name,
+            "description": schema.description,
+            "category": schema.category,
+            "inputs": [build_input_def(inp) for inp in schema.inputs],
+            "outputs": [
+                {
+                    "name": out.name,
+                    "type": out.type.value.upper(),
+                    "description": out.description or "",
+                }
+                for out in schema.outputs
+            ],
+        }
+
+        inputs = {}
+        for input_name, step_input in step.inputs.items():
+            if step_input.source == InputSource.STATIC:
+                inputs[input_name] = {
+                    "type": "static",
+                    "value": step_input.value,
+                }
+            elif step_input.source == InputSource.STEP_OUTPUT:
+                source_node_id = step_id_to_node_id.get(step_input.source_step_id, "")
+                inputs[input_name] = {
+                    "type": "connection",
+                    "sourceNodeId": source_node_id,
+                    "sourceOutput": step_input.source_output,
+                }
+            elif step_input.source == InputSource.USER_INPUT:
+                inputs[input_name] = {
+                    "type": "user_input",
+                    "value": step_input.value,
+                }
+
+        node = {
+            "id": node_id,
+            "toolId": step.tool_id,
+            "tool": tool_def,
+            "position": {"x": x_position, "y": y_position + idx * y_spacing},
+            "inputs": inputs,
+        }
+        nodes.append(node)
+
+    edges = []
+    edge_idx = 0
+    for step in pipeline.steps:
+        target_node_id = step_id_to_node_id.get(step.step_id)
+        if not target_node_id:
+            continue
+
+        for input_name, step_input in step.inputs.items():
+            if step_input.source == InputSource.STEP_OUTPUT and step_input.source_step_id:
+                source_node_id = step_id_to_node_id.get(step_input.source_step_id)
+                if source_node_id:
+                    edge = {
+                        "id": f"edge_{edge_idx}",
+                        "sourceNodeId": source_node_id,
+                        "sourceOutput": step_input.source_output,
+                        "targetNodeId": target_node_id,
+                        "targetInput": input_name,
+                    }
+                    edges.append(edge)
+                    edge_idx += 1
+
+    return {
+        "id": pipeline.pipeline_id,
+        "name": pipeline.name,
+        "description": pipeline.description or "",
+        "nodes": nodes,
+        "edges": edges,
+    }
+
+
+def has_current_pipeline() -> bool:
+    """Check if there's an active pipeline."""
+    manager = _get_manager()
+    return manager.current_pipeline is not None and len(manager.current_pipeline.steps) > 0

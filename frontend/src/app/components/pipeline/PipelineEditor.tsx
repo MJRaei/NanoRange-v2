@@ -2,7 +2,8 @@
 
 /**
  * PipelineEditor Component
- * Main container that composes all pipeline editing components
+ * Main container that composes all pipeline editing components.
+ * Uses PipelineContext for shared state with Chat component.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -10,7 +11,7 @@ import { PipelineCanvas } from './PipelineCanvas';
 import { ToolPalette } from './ToolPalette';
 import { ParameterPanel } from './ParameterPanel';
 import { PipelineToolbar } from './PipelineToolbar';
-import { usePipeline } from './hooks/usePipeline';
+import { usePipelineContext } from './PipelineContext';
 import { pipelineService } from '../../services/pipelineService';
 import type { ToolDefinition, Position } from './types';
 
@@ -35,7 +36,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
     runPipeline,
     getNodeInputConnections,
     getNodeOutputConnections,
-  } = usePipeline();
+  } = usePipelineContext();
 
   const [leftPanelWidth, setLeftPanelWidth] = useState(200);
   const [rightPanelWidth, setRightPanelWidth] = useState(280);

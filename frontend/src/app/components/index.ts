@@ -11,5 +11,6 @@ export * from "./types";
 export * from "./api";
 
 // Pipeline editor components
-export { PipelineEditor } from "./pipeline";
+export { PipelineEditor, PipelineProvider, usePipelineContext } from "./pipeline";
+export type { Pipeline } from "./pipeline";
 

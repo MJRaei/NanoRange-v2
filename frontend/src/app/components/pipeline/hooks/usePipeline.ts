@@ -47,6 +47,7 @@ interface UsePipelineReturn {
   clearPipeline: () => void;
   setPipelineName: (name: string) => void;
   runPipeline: () => Promise<void>;
+  loadPipeline: (pipelineData: Pipeline) => void;
 
   // Validation
   canConnect: (sourceNodeId: string, targetNodeId: string) => boolean;
@@ -270,6 +271,12 @@ export function usePipeline(): UsePipelineReturn {
     setPipeline((prev) => ({ ...prev, name }));
   }, []);
 
+  const loadPipeline = useCallback((pipelineData: Pipeline) => {
+    setPipeline(pipelineData);
+    setSelectedNodeId(null);
+    setExecutionState({ status: 'idle' });
+  }, []);
+
   const runPipeline = useCallback(async () => {
     setExecutionState({ status: 'running' });
 
@@ -333,6 +340,7 @@ export function usePipeline(): UsePipelineReturn {
     clearPipeline,
     setPipelineName,
     runPipeline,
+    loadPipeline,
     canConnect,
     getNodeInputConnections,
     getNodeOutputConnections,

@@ -38,6 +38,63 @@ export interface AnalysisResult {
   images: AnalysisImages;
   csv_path: string | null;
   session_id: string;
+  pipeline?: AgentPipeline | null;  // Pipeline built by the agent
+}
+
+// Pipeline structure from agent (matches backend format)
+export interface AgentPipeline {
+  id: string;
+  name: string;
+  description?: string;
+  nodes: AgentPipelineNode[];
+  edges: AgentPipelineEdge[];
+}
+
+export interface AgentPipelineNode {
+  id: string;
+  toolId: string;
+  tool: AgentToolDefinition;
+  position: { x: number; y: number };
+  inputs: Record<string, AgentNodeInputValue>;
+}
+
+export interface AgentToolDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  inputs: AgentToolInput[];
+  outputs: AgentToolOutput[];
+}
+
+export interface AgentToolInput {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+  default?: unknown;
+  constraints?: Record<string, unknown>;
+}
+
+export interface AgentToolOutput {
+  name: string;
+  type: string;
+  description: string;
+}
+
+export interface AgentNodeInputValue {
+  type: 'static' | 'connection' | 'user_input';
+  value?: unknown;
+  sourceNodeId?: string;
+  sourceOutput?: string;
+}
+
+export interface AgentPipelineEdge {
+  id: string;
+  sourceNodeId: string;
+  sourceOutput: string;
+  targetNodeId: string;
+  targetInput: string;
 }
 
 export interface FileInfo {
