@@ -117,28 +117,32 @@ def backend_tool_to_frontend(tool_schema: ToolSchema) -> ToolSchemaResponse:
     Returns:
         Frontend-compatible tool schema
     """
+    inputs = []
+    for inp in tool_schema.inputs:
+        if inp.name == "output_path" and tool_schema.tool_id != "save_image":
+            continue
+
+        inputs.append({
+            "name": inp.name,
+            "type": inp.type.value.upper(),
+            "description": inp.description,
+            "required": inp.required,
+            "default": inp.default,
+            "constraints": {
+                k: v for k, v in {
+                    "min_value": inp.min_value,
+                    "max_value": inp.max_value,
+                    "choices": inp.choices,
+                }.items() if v is not None
+            } if inp.min_value or inp.max_value or inp.choices else None
+        })
+
     return ToolSchemaResponse(
         id=tool_schema.tool_id,
         name=tool_schema.name,
         description=tool_schema.description,
         category=tool_schema.category,
-        inputs=[
-            {
-                "name": inp.name,
-                "type": inp.type.value.upper(),  # IMAGE -> "IMAGE"
-                "description": inp.description,
-                "required": inp.required,
-                "default": inp.default,
-                "constraints": {
-                    k: v for k, v in {
-                        "min_value": inp.min_value,
-                        "max_value": inp.max_value,
-                        "choices": inp.choices,
-                    }.items() if v is not None
-                } if inp.min_value or inp.max_value or inp.choices else None
-            }
-            for inp in tool_schema.inputs
-        ],
+        inputs=inputs,
         outputs=[
             {
                 "name": out.name,
@@ -364,7 +368,8 @@ async def execute_pipeline(request: PipelineExecuteRequest):
             }
 
         # Execute pipeline in background
-        asyncio.create_task(_execute_pipeline_async(execution_id, pipeline))
+        session_id = request.session_id or execution_id
+        asyncio.create_task(_execute_pipeline_async(execution_id, pipeline, session_id))
 
         return PipelineExecuteResponse(
             execution_id=execution_id,
@@ -383,17 +388,18 @@ async def execute_pipeline(request: PipelineExecuteRequest):
         )
 
 
-async def _execute_pipeline_async(execution_id: str, pipeline: Pipeline):
+async def _execute_pipeline_async(execution_id: str, pipeline: Pipeline, session_id: str):
     """
     Execute pipeline asynchronously and update execution status.
 
     Args:
         execution_id: Execution identifier
         pipeline: Pipeline to execute
+        session_id: Session identifier
     """
     try:
         # Create executor
-        executor = PipelineExecutor(registry=get_registry())
+        executor = PipelineExecutor(registry=get_registry(), session_id=session_id)
 
         # Execute pipeline
         result = executor.execute(pipeline)

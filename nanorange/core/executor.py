@@ -9,6 +9,7 @@ Handles:
 """
 
 import traceback
+import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 from nanorange.core.schemas import (
@@ -21,6 +22,7 @@ from nanorange.core.schemas import (
 )
 from nanorange.core.registry import ToolRegistry, get_registry
 from nanorange.core.validator import PipelineValidator
+from nanorange.storage.file_store import FileStore
 
 
 class ExecutionContext:
@@ -65,7 +67,8 @@ class PipelineExecutor:
         self,
         registry: Optional[ToolRegistry] = None,
         validator: Optional[PipelineValidator] = None,
-        user_input_handler: Optional[Callable[[str, str], Any]] = None
+        user_input_handler: Optional[Callable[[str, str], Any]] = None,
+        session_id: Optional[str] = None
     ):
         """
         Initialize the executor.
@@ -74,10 +77,13 @@ class PipelineExecutor:
             registry: Tool registry (defaults to global)
             validator: Pipeline validator
             user_input_handler: Function to get user input (prompt, param_name) -> value
+            session_id: Session identifier (defaults to new UUID)
         """
         self.registry = registry or get_registry()
         self.validator = validator or PipelineValidator(self.registry)
         self.user_input_handler = user_input_handler
+        self.session_id = session_id or str(uuid.uuid4())
+        self.file_store = FileStore()
     
     def execute(
         self,
@@ -175,6 +181,11 @@ class PipelineExecutor:
         
         return result
     
+    def _get_step_dir_name(self, step: PipelineStep) -> str:
+        """Generate a friendly directory name for a step."""
+        safe_name = "".join(c if c.isalnum() else "_" for c in step.step_name)
+        return f"{safe_name}_{step.step_id[:8]}"
+
     def _execute_step(
         self,
         step: PipelineStep,
@@ -219,6 +230,36 @@ class PipelineExecutor:
             if not isinstance(outputs, dict):
                 outputs = {"result": outputs}
             
+            step_dir_name = self._get_step_dir_name(step)
+            
+            if step.tool_id == "load_image" and "image_path" in resolved_inputs:
+                try:
+                    source_path = resolved_inputs["image_path"]
+                    self.file_store.save_file(
+                        source_path=source_path,
+                        session_id=self.session_id,
+                        pipeline_id=context.pipeline.pipeline_id,
+                        step_id=step_dir_name,
+                        output_name="input",
+                        copy=True
+                    )
+                except Exception as e:
+                    print(f"Warning: Failed to copy load_image input to session: {e}")
+
+            elif step.tool_id == "save_image" and "saved_path" in outputs:
+                try:
+                    saved_path = outputs["saved_path"]
+                    self.file_store.save_file(
+                        source_path=saved_path,
+                        session_id=self.session_id,
+                        pipeline_id=context.pipeline.pipeline_id,
+                        step_id=step_dir_name,
+                        output_name="output",
+                        copy=True
+                    )
+                except Exception as e:
+                    print(f"Warning: Failed to copy save_image output to session: {e}")
+
             result.outputs = outputs
             result.status = StepStatus.COMPLETED
             step.status = StepStatus.COMPLETED
@@ -285,6 +326,29 @@ class PipelineExecutor:
                         f"User input required for {input_name} but no handler provided"
                     )
         
+
+        if schema:
+            for inp in schema.inputs:
+                if inp.name == "output_path":
+                    if step.tool_id == "save_image" and "output_path" in resolved:
+                        continue
+                        
+                    extension = "png" # Default
+                    if step.tool_id == "find_contours":
+                        extension = "json"
+                    
+                    step_dir_name = self._get_step_dir_name(step)
+                    
+                    output_path = self.file_store.generate_output_path(
+                        session_id=self.session_id,
+                        pipeline_id=context.pipeline.pipeline_id,
+                        step_id=step_dir_name,
+                        output_name="output",
+                        extension=extension
+                    )
+                    
+                    resolved["output_path"] = str(output_path)
+
         return resolved
     
     def execute_single_step(
