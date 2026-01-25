@@ -1026,12 +1026,17 @@ def get_current_pipeline_for_frontend() -> Optional[Dict[str, Any]]:
                 input_def["constraints"] = constraints
             return input_def
 
+        filtered_inputs = [
+            inp for inp in schema.inputs
+            if not (inp.name == "output_path" and schema.tool_id != "save_image")
+        ]
+
         tool_def = {
             "id": schema.tool_id,
             "name": schema.name,
             "description": schema.description,
             "category": schema.category,
-            "inputs": [build_input_def(inp) for inp in schema.inputs],
+            "inputs": [build_input_def(inp) for inp in filtered_inputs],
             "outputs": [
                 {
                     "name": out.name,
