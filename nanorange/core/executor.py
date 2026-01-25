@@ -182,9 +182,25 @@ class PipelineExecutor:
         return result
     
     def _get_step_dir_name(self, step: PipelineStep) -> str:
-        """Generate a friendly directory name for a step."""
-        safe_name = "".join(c if c.isalnum() else "_" for c in step.step_name)
-        return f"{safe_name}_{step.step_id[:8]}"
+        """
+        Generate a consistent directory name for a step.
+
+        Uses tool_id (which is consistent across both UI and agent execution)
+        plus a normalized suffix from step_id for uniqueness.
+
+        Examples:
+          - threshold_abc12345
+          - load_image_xyz98765
+        """
+        safe_tool_id = "".join(c if c.isalnum() else "_" for c in step.tool_id)
+
+        step_id = step.step_id
+        if step_id.startswith("node_"):
+            step_id_suffix = step_id[5:13]
+        else:
+            step_id_suffix = step_id.replace("-", "")[:8]
+
+        return f"{safe_tool_id}_{step_id_suffix}"
 
     def _execute_step(
         self,
