@@ -248,9 +248,10 @@ function ChatView() {
       >
         {/* Header */}
         <header
-          className="flex items-center justify-between pl-6 pr-0 py-4 border-b shrink-0"
+          className="relative flex items-center justify-center pl-6 pr-0 py-4 border-b shrink-0"
           style={{ borderColor: "rgba(255, 107, 53, 0.1)" }}
         >
+          {/* Centered NanOrange text */}
           <div className="flex items-center gap-3">
             <NanoIcon size="small" />
             <h1 className="text-xl font-semibold">
@@ -258,9 +259,10 @@ function ChatView() {
               <span style={{ color: "#ff6b35" }}>Orange</span>
             </h1>
           </div>
+          {/* Right-aligned button */}
           <button
             onClick={() => setShowPipeline(!showPipeline)}
-            className="group flex items-center gap-2 pl-2 pr-4 py-1.5 rounded-l-lg text-xs font-medium transition-colors hover:bg-white/5"
+            className="absolute right-0 group flex items-center gap-2 pl-2 pr-4 py-1.5 rounded-l-lg text-xs font-medium transition-colors hover:bg-white/5"
             style={{ color: showPipeline ? "#ff6b35" : "#6a655d" }}
           >
             <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
