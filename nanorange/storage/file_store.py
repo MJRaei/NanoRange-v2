@@ -202,21 +202,24 @@ class FileStore:
     ) -> List[Dict[str, Any]]:
         """
         List files in the store.
-        
+
         Args:
             session_id: Session ID
             pipeline_id: Optional pipeline filter
             step_id: Optional step filter
-            
+
         Returns:
             List of file info dictionaries
         """
         if step_id and pipeline_id:
-            search_path = self.get_step_path(session_id, pipeline_id, step_id)
+            search_path = self.base_path / "sessions" / session_id / "pipelines" / pipeline_id / step_id
         elif pipeline_id:
-            search_path = self.get_pipeline_path(session_id, pipeline_id)
+            search_path = self.base_path / "sessions" / session_id / "pipelines" / pipeline_id
         else:
-            search_path = self.get_session_path(session_id)
+            search_path = self.base_path / "sessions" / session_id
+
+        if not search_path.exists():
+            return []
         
         files = []
         for path in search_path.rglob("*"):

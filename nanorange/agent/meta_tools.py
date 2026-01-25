@@ -78,7 +78,9 @@ def _get_executor() -> PipelineExecutor:
     """Get or create the pipeline executor."""
     global _current_executor
     if _current_executor is None:
-        _current_executor = PipelineExecutor()
+        # Use session_id from the current session to ensure files are saved to the correct folder
+        session = _get_session()
+        _current_executor = PipelineExecutor(session_id=session.session_id)
     return _current_executor
 
 
