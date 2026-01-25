@@ -248,7 +248,7 @@ function ChatView() {
       >
         {/* Header */}
         <header
-          className="flex items-center justify-between px-6 py-4 border-b shrink-0"
+          className="flex items-center justify-between pl-6 pr-0 py-4 border-b shrink-0"
           style={{ borderColor: "rgba(255, 107, 53, 0.1)" }}
         >
           <div className="flex items-center gap-3">
@@ -260,9 +260,12 @@ function ChatView() {
           </div>
           <button
             onClick={() => setShowPipeline(!showPipeline)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-white/5"
+            className="group flex items-center gap-2 pl-2 pr-4 py-1.5 rounded-l-lg text-xs font-medium transition-colors hover:bg-white/5"
             style={{ color: showPipeline ? "#ff6b35" : "#6a655d" }}
           >
+            <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              {showPipeline ? "Hide Pipeline" : "Show Pipeline"}
+            </span>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
@@ -271,7 +274,6 @@ function ChatView() {
                 d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
               />
             </svg>
-            {showPipeline ? "Hide Pipeline" : "Show Pipeline"}
           </button>
         </header>
 
