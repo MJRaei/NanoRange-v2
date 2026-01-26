@@ -86,9 +86,6 @@ export function ToolPalette({ onToolSelect }: ToolPaletteProps) {
   if (loading) {
     return (
       <div className="h-full flex flex-col" style={{ backgroundColor: '#111' }}>
-        <div className="p-3 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-          <h3 className="text-sm font-semibold text-white mb-2">Tools</h3>
-        </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-2"></div>
@@ -103,9 +100,6 @@ export function ToolPalette({ onToolSelect }: ToolPaletteProps) {
   if (error) {
     return (
       <div className="h-full flex flex-col" style={{ backgroundColor: '#111' }}>
-        <div className="p-3 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-          <h3 className="text-sm font-semibold text-white mb-2">Tools</h3>
-        </div>
         <div className="flex-1 flex flex-col items-center justify-center p-4">
           <svg
             className="w-12 h-12 text-red-500 mb-3"
@@ -135,9 +129,8 @@ export function ToolPalette({ onToolSelect }: ToolPaletteProps) {
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: '#111' }}>
-      {/* Header */}
+      {/* Search */}
       <div className="p-3 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-        <h3 className="text-sm font-semibold text-white mb-2">Tools</h3>
         <input
           type="text"
           placeholder="Search tools..."

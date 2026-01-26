@@ -9,11 +9,14 @@
 import React, { useState, useCallback } from 'react';
 import { PipelineCanvas } from './PipelineCanvas';
 import { ToolPalette } from './ToolPalette';
+import { SavedPipelinesPanel } from './SavedPipelinesPanel';
 import { ParameterPanel } from './ParameterPanel';
 import { PipelineToolbar } from './PipelineToolbar';
 import { usePipelineContext } from './PipelineContext';
 import { pipelineService } from '../../services/pipelineService';
-import type { ToolDefinition, Position } from './types';
+import type { ToolDefinition, Position, Pipeline } from './types';
+
+type LeftPanelTab = 'tools' | 'saved';
 
 interface PipelineEditorProps {
   className?: string;
@@ -34,14 +37,16 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
     clearPipeline,
     setPipelineName,
     runPipeline,
+    loadPipeline,
     getNodeInputConnections,
     getNodeOutputConnections,
   } = usePipelineContext();
 
-  const [leftPanelWidth, setLeftPanelWidth] = useState(200);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(220);
   const [rightPanelWidth, setRightPanelWidth] = useState(280);
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+  const [leftPanelTab, setLeftPanelTab] = useState<LeftPanelTab>('tools');
 
   const handleDropTool = useCallback(
     (tool: ToolDefinition, position: Position) => {
@@ -68,6 +73,12 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
     }
   }, [pipeline]);
 
+  const handleLoadPipeline = useCallback((loadedPipeline: Pipeline) => {
+    loadPipeline(loadedPipeline);
+    // Switch to tools tab after loading
+    setLeftPanelTab('tools');
+  }, [loadPipeline]);
+
   return (
     <div className={`flex flex-col h-full ${className}`} style={{ backgroundColor: '#0a0908' }}>
       {/* Toolbar */}
@@ -83,7 +94,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
 
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left panel - Tool Palette */}
+        {/* Left panel - Tool Palette / Saved Pipelines */}
         <div
           className="flex-shrink-0 border-r transition-all duration-200"
           style={{
@@ -112,27 +123,61 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
             </button>
           ) : (
             <div className="h-full flex flex-col">
-              <button
-                onClick={toggleLeftPanel}
-                className="flex-shrink-0 w-full p-2 flex items-center justify-end hover:bg-white/5 transition-colors border-b"
+              {/* Tab header with collapse button */}
+              <div
+                className="flex-shrink-0 flex items-center border-b"
                 style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
               >
-                <svg
-                  className="w-4 h-4 text-gray-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+                {/* Tabs */}
+                <div className="flex-1 flex">
+                  <button
+                    onClick={() => setLeftPanelTab('tools')}
+                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                      leftPanelTab === 'tools'
+                        ? 'text-orange-400 border-b-2 border-orange-400'
+                        : 'text-gray-400 hover:text-gray-300'
+                    }`}
+                  >
+                    Tools
+                  </button>
+                  <button
+                    onClick={() => setLeftPanelTab('saved')}
+                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                      leftPanelTab === 'saved'
+                        ? 'text-orange-400 border-b-2 border-orange-400'
+                        : 'text-gray-400 hover:text-gray-300'
+                    }`}
+                  >
+                    Saved
+                  </button>
+                </div>
+                {/* Collapse button */}
+                <button
+                  onClick={toggleLeftPanel}
+                  className="p-2 flex items-center justify-center hover:bg-white/5 transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    className="w-4 h-4 text-gray-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                    />
+                  </svg>
+                </button>
+              </div>
+              {/* Tab content */}
               <div className="flex-1 overflow-hidden">
-                <ToolPalette />
+                {leftPanelTab === 'tools' ? (
+                  <ToolPalette />
+                ) : (
+                  <SavedPipelinesPanel onLoadPipeline={handleLoadPipeline} />
+                )}
               </div>
             </div>
           )}

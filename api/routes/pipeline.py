@@ -5,12 +5,10 @@ Handles pipeline-related API requests including tool listing,
 pipeline execution, and pipeline persistence.
 """
 
-import os
 import json
 import uuid
 import asyncio
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -20,11 +18,9 @@ from nanorange.core.schemas import ToolSchema, InputSchema, OutputSchema, DataTy
 from nanorange.core.executor import PipelineExecutor
 from nanorange.core.pipeline import Pipeline, PipelineStep
 from nanorange.core.schemas import StepInput, InputSource, StepStatus
+from nanorange.storage.database import get_session, SavedPipelineModel
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
-
-# Directory for storing saved pipelines
-PIPELINES_DIR = "data/pipelines"
 
 # In-memory storage for pipeline executions (can upgrade to Redis later)
 pipeline_executions: Dict[str, Any] = {}
@@ -473,9 +469,7 @@ async def get_execution_status(execution_id: str):
 @router.post("/save", response_model=PipelineSaveResponse)
 async def save_pipeline(request: PipelineSaveRequest):
     """
-    Save a pipeline to disk.
-
-    Pipelines are stored as JSON files in the data/pipelines directory.
+    Save a pipeline to the database.
 
     Args:
         request: Pipeline save request
@@ -483,28 +477,31 @@ async def save_pipeline(request: PipelineSaveRequest):
     Returns:
         Pipeline ID and save timestamp
     """
+    db = None
     try:
-        # Ensure pipelines directory exists
-        os.makedirs(PIPELINES_DIR, exist_ok=True)
+        db = get_session()
 
-        # Generate pipeline ID if not provided
-        pipeline_id = request.pipeline.get("id", str(uuid.uuid4()))
+        existing = db.query(SavedPipelineModel).filter_by(name=request.name).first()
 
-        # Add metadata
         now = datetime.now()
-        pipeline_data = {
-            **request.pipeline,
-            "id": pipeline_id,
-            "name": request.name,
-            "description": request.description or "",
-            "created_at": now.isoformat(),
-            "modified_at": now.isoformat(),
-        }
 
-        # Save to file
-        file_path = os.path.join(PIPELINES_DIR, f"{pipeline_id}.json")
-        with open(file_path, "w") as f:
-            json.dump(pipeline_data, f, indent=2)
+        if existing:
+            existing.description = request.description or ""
+            existing.definition_json = json.dumps(request.pipeline)
+            existing.updated_at = now
+            pipeline_id = str(existing.id)
+        else:
+            new_pipeline = SavedPipelineModel(
+                name=request.name,
+                description=request.description or "",
+                category="user",
+                definition_json=json.dumps(request.pipeline),
+            )
+            db.add(new_pipeline)
+            db.flush()
+            pipeline_id = str(new_pipeline.id)
+
+        db.commit()
 
         return PipelineSaveResponse(
             pipeline_id=pipeline_id,
@@ -512,50 +509,46 @@ async def save_pipeline(request: PipelineSaveRequest):
         )
 
     except Exception as e:
+        if db:
+            db.rollback()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to save pipeline: {str(e)}"
         )
+    finally:
+        if db:
+            db.close()
 
 
 @router.get("/saved", response_model=SavedPipelinesResponse)
 async def list_saved_pipelines():
     """
-    List all saved pipelines.
+    List all saved pipelines from the database.
 
     Returns:
         List of pipeline summaries
     """
+    db = None
     try:
-        # Ensure directory exists
-        os.makedirs(PIPELINES_DIR, exist_ok=True)
+        db = get_session()
+
+        pipelines = db.query(SavedPipelineModel).order_by(
+            SavedPipelineModel.updated_at.desc()
+        ).all()
 
         summaries = []
+        for p in pipelines:
+            definition = p.definition
+            step_count = len(definition.get("nodes", []))
 
-        # Read all pipeline files
-        for filename in os.listdir(PIPELINES_DIR):
-            if not filename.endswith(".json"):
-                continue
-
-            file_path = os.path.join(PIPELINES_DIR, filename)
-            try:
-                with open(file_path, "r") as f:
-                    data = json.load(f)
-
-                summaries.append(PipelineSummary(
-                    pipeline_id=data.get("id", filename.replace(".json", "")),
-                    name=data.get("name", "Untitled"),
-                    description=data.get("description"),
-                    created_at=datetime.fromisoformat(data.get("created_at", datetime.now().isoformat())),
-                    modified_at=datetime.fromisoformat(data.get("modified_at", datetime.now().isoformat())),
-                    step_count=len(data.get("nodes", []))
-                ))
-            except Exception as e:
-                print(f"Warning: Could not read pipeline {filename}: {e}")
-                continue
-
-        # Sort by modified date (newest first)
-        summaries.sort(key=lambda x: x.modified_at, reverse=True)
+            summaries.append(PipelineSummary(
+                pipeline_id=str(p.id),
+                name=p.name,
+                description=p.description,
+                created_at=p.created_at,
+                modified_at=p.updated_at,
+                step_count=step_count
+            ))
 
         return SavedPipelinesResponse(pipelines=summaries)
 
@@ -564,70 +557,105 @@ async def list_saved_pipelines():
             status_code=500,
             detail=f"Failed to list saved pipelines: {str(e)}"
         )
+    finally:
+        if db:
+            db.close()
 
 
 @router.get("/saved/{pipeline_id}")
 async def load_pipeline(pipeline_id: str):
     """
-    Load a saved pipeline.
+    Load a saved pipeline from the database.
 
     Args:
-        pipeline_id: Pipeline identifier
+        pipeline_id: Pipeline identifier (database ID)
 
     Returns:
         Complete pipeline definition
     """
+    db = None
     try:
-        file_path = os.path.join(PIPELINES_DIR, f"{pipeline_id}.json")
+        db = get_session()
 
-        if not os.path.exists(file_path):
+        pipeline = db.query(SavedPipelineModel).filter_by(id=int(pipeline_id)).first()
+
+        if not pipeline:
             raise HTTPException(
                 status_code=404,
                 detail=f"Pipeline '{pipeline_id}' not found"
             )
 
-        with open(file_path, "r") as f:
-            pipeline_data = json.load(f)
+        pipeline.use_count += 1
+        pipeline.last_used_at = datetime.now()
+        db.commit()
+
+        pipeline_data = pipeline.definition
+        pipeline_data["id"] = str(pipeline.id)
+        pipeline_data["name"] = pipeline.name
+        pipeline_data["description"] = pipeline.description
 
         return pipeline_data
 
     except HTTPException:
         raise
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid pipeline ID: {pipeline_id}"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to load pipeline: {str(e)}"
         )
+    finally:
+        if db:
+            db.close()
 
 
 @router.delete("/saved/{pipeline_id}")
 async def delete_pipeline(pipeline_id: str):
     """
-    Delete a saved pipeline.
+    Delete a saved pipeline from the database.
 
     Args:
-        pipeline_id: Pipeline identifier
+        pipeline_id: Pipeline identifier (database ID)
 
     Returns:
         Success message
     """
+    db = None
     try:
-        file_path = os.path.join(PIPELINES_DIR, f"{pipeline_id}.json")
+        db = get_session()
 
-        if not os.path.exists(file_path):
+        pipeline = db.query(SavedPipelineModel).filter_by(id=int(pipeline_id)).first()
+
+        if not pipeline:
             raise HTTPException(
                 status_code=404,
                 detail=f"Pipeline '{pipeline_id}' not found"
             )
 
-        os.remove(file_path)
+        pipeline_name = pipeline.name
+        db.delete(pipeline)
+        db.commit()
 
-        return {"success": True, "message": f"Pipeline '{pipeline_id}' deleted"}
+        return {"success": True, "message": f"Pipeline '{pipeline_name}' deleted"}
 
     except HTTPException:
         raise
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid pipeline ID: {pipeline_id}"
+        )
     except Exception as e:
+        if db:
+            db.rollback()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to delete pipeline: {str(e)}"
         )
+    finally:
+        if db:
+            db.close()
