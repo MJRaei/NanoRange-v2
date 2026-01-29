@@ -260,10 +260,12 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
         <p className="text-xs text-gray-500 mt-1">{node.tool.description}</p>
       </div>
 
-      {/* Parameters */}
-      <div className="flex-1 overflow-y-auto p-3">
-        {/* Connectable inputs (IMAGE/MASK) - shown as connection status */}
-        {connectableInputs.length > 0 && (
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {/* Parameters */}
+        <div className="p-3">
+          {/* Connectable inputs (IMAGE/MASK) - shown as connection status */}
+          {connectableInputs.length > 0 && (
           <div className="mb-4">
             <h4 className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">
               Connections
@@ -352,9 +354,9 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
             This tool has no configurable parameters
           </p>
         ) : null}
-      </div>
+        </div>
 
-      {/* Outputs info */}
+        {/* Outputs info */}
       {node.tool.outputs.length > 0 && (
         <div className="p-3 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
           <h4 className="text-xs font-medium text-gray-400 mb-2">Outputs</h4>
@@ -509,6 +511,7 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
           )}
         </div>
       )}
+      </div>
 
       {/* Expanded image modal */}
       {expandedImage && (
