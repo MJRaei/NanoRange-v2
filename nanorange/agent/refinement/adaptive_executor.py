@@ -90,11 +90,12 @@ class AdaptiveExecutor:
         user_input_handler: Optional[Callable[[str, str], Any]] = None,
         refinement_enabled: Optional[bool] = None,
         max_iterations: Optional[int] = None,
-        save_iteration_artifacts: bool = True
+        save_iteration_artifacts: bool = True,
+        session_id: Optional[str] = None
     ):
         """
         Initialize the adaptive executor.
-        
+
         Args:
             registry: Tool registry
             validator: Pipeline validator
@@ -104,13 +105,15 @@ class AdaptiveExecutor:
             refinement_enabled: Whether to enable refinement (defaults to settings)
             max_iterations: Max iterations per tool (defaults to settings)
             save_iteration_artifacts: Whether to save outputs from each iteration
+            session_id: Session identifier for consistent path with normal execution
         """
         self.registry = registry or get_registry()
         self.validator = validator or PipelineValidator(self.registry)
         self.reviewer = reviewer or ImageReviewer()
         self.optimizer = optimizer or ParameterOptimizer()
         self.user_input_handler = user_input_handler
-        
+        self.session_id = session_id
+
         self.refinement_enabled = (
             refinement_enabled if refinement_enabled is not None
             else settings.REFINEMENT_ENABLED
@@ -140,6 +143,7 @@ class AdaptiveExecutor:
         artifact_manager = None
         if self.save_iteration_artifacts:
             artifact_manager = ArtifactManager(
+                session_id=self.session_id,
                 pipeline_id=pipeline.pipeline_id,
                 pipeline_name=pipeline.name
             )

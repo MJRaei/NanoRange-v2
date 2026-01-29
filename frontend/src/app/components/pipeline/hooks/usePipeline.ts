@@ -14,6 +14,8 @@ import type {
   NodeInputValue,
   PipelineExecutionState,
   NodeExecutionResult,
+  IterationResult,
+  RefinementInfo,
 } from '../types';
 import { pipelineService } from '../../../services/pipelineService';
 import { getPortConfig, areTypesCompatible } from '../utils/connectionUtils';
@@ -31,6 +33,7 @@ interface UsePipelineReturn {
   selectedNodeId: string | null;
   selectedNode: PipelineNode | null;
   executionState: PipelineExecutionState;
+  adaptiveMode: boolean;
 
   // Node operations
   addNode: (tool: ToolDefinition, position: Position) => string;
@@ -49,6 +52,7 @@ interface UsePipelineReturn {
   setPipelineName: (name: string) => void;
   runPipeline: () => Promise<void>;
   loadPipeline: (pipelineData: Pipeline) => void;
+  setAdaptiveMode: (enabled: boolean) => void;
   setExecutionResults: (executionResult: {
     status: string;
     step_results?: Array<{
@@ -77,6 +81,7 @@ const initialPipeline: Pipeline = {
 export function usePipeline(): UsePipelineReturn {
   const [pipeline, setPipeline] = useState<Pipeline>(initialPipeline);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [adaptiveMode, setAdaptiveMode] = useState<boolean>(false);
   const [executionState, setExecutionState] = useState<PipelineExecutionState>({
     status: 'idle',
   });
@@ -331,11 +336,15 @@ export function usePipeline(): UsePipelineReturn {
   }, []);
 
   const runPipeline = useCallback(async () => {
-    setExecutionState({ status: 'running' });
+    setExecutionState({ status: 'running', adaptiveMode });
 
     try {
-      // Start pipeline execution on backend
-      const { execution_id } = await pipelineService.executePipeline(pipeline);
+      // Start pipeline execution on backend with adaptive mode flag
+      const { execution_id } = await pipelineService.executePipeline(
+        pipeline,
+        undefined,
+        adaptiveMode
+      );
 
       // Poll for status updates
       const pollStatus = async () => {
@@ -358,6 +367,44 @@ export function usePipeline(): UsePipelineReturn {
                 status: stepResult.status as 'pending' | 'running' | 'completed' | 'failed',
                 outputs: stepResult.outputs || {},
                 errorMessage: stepResult.error_message,
+                iterations: stepResult.iterations?.map(iter => ({
+                  iteration: iter.iteration,
+                  inputs: iter.inputs,
+                  outputs: iter.outputs,
+                  durationSeconds: iter.duration_seconds,
+                  decision: iter.decision,
+                  artifacts: iter.artifacts,
+                })),
+                finalIteration: stepResult.final_iteration,
+              };
+            }
+          }
+
+          // Map refinement info if available
+          let refinementInfo: RefinementInfo | undefined;
+          if (status.refinement_info) {
+            refinementInfo = {
+              totalIterations: status.refinement_info.total_iterations,
+              stepsRefined: status.refinement_info.steps_refined,
+              toolsRemoved: status.refinement_info.tools_removed,
+              stepDetails: {},
+            };
+            for (const [stepId, details] of Object.entries(status.refinement_info.step_details)) {
+              refinementInfo.stepDetails[stepId] = {
+                stepName: details.step_name,
+                toolId: details.tool_id,
+                totalIterations: details.total_iterations,
+                finalIteration: details.final_iteration,
+                wasRemoved: details.was_removed,
+                removalReason: details.removal_reason,
+                iterations: details.iterations.map(iter => ({
+                  iteration: iter.iteration,
+                  inputs: iter.inputs,
+                  outputs: iter.outputs,
+                  durationSeconds: iter.duration_seconds,
+                  decision: iter.decision,
+                  artifacts: iter.artifacts,
+                })),
               };
             }
           }
@@ -368,6 +415,8 @@ export function usePipeline(): UsePipelineReturn {
             results: status.result?.final_outputs,
             nodeResults,
             error: status.error,
+            adaptiveMode: status.adaptive_mode,
+            refinementInfo,
           });
 
           // Continue polling if still running
@@ -390,13 +439,14 @@ export function usePipeline(): UsePipelineReturn {
         error: error instanceof Error ? error.message : 'Execution failed',
       });
     }
-  }, [pipeline]);
+  }, [pipeline, adaptiveMode]);
 
   return {
     pipeline,
     selectedNodeId,
     selectedNode,
     executionState,
+    adaptiveMode,
     addNode,
     removeNode,
     updateNodePosition,
@@ -409,6 +459,7 @@ export function usePipeline(): UsePipelineReturn {
     setPipelineName,
     runPipeline,
     loadPipeline,
+    setAdaptiveMode,
     setExecutionResults,
     canConnect,
     getNodeInputConnections,

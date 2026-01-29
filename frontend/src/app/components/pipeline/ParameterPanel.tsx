@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import type { PipelineNode, NodeInputValue, DataType, PipelineEdge, PipelineExecutionState } from './types';
+import type { PipelineNode, NodeInputValue, DataType, PipelineEdge, PipelineExecutionState, IterationResult } from './types';
 import { isConnectableType, getInputSatisfactionStatus } from './utils/connectionUtils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -179,6 +179,7 @@ function isImagePath(value: unknown): value is string {
 
 export function ParameterPanel({ node, inputConnections, executionState, onUpdateInput, onDeleteNode }: ParameterPanelProps) {
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const [showIterations, setShowIterations] = useState<boolean>(true);
 
   const handleInputChange = useCallback(
     (inputName: string, value: NodeInputValue) => {
@@ -409,6 +410,103 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Iteration history (adaptive mode) */}
+      {nodeResult?.iterations && nodeResult.iterations.length > 1 && (
+        <div className="p-3 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-medium text-gray-400">
+              Refinement Iterations ({nodeResult.iterations.length})
+            </h4>
+            <button
+              onClick={() => setShowIterations(!showIterations)}
+              className="text-[10px] text-orange-400 hover:text-orange-300"
+            >
+              {showIterations ? 'Hide' : 'Show'}
+            </button>
+          </div>
+
+          {showIterations && (
+            <div className="space-y-3">
+              {nodeResult.iterations.map((iteration, idx) => {
+                const isFinal = iteration.iteration === nodeResult.finalIteration;
+                const imageOutputKey = Object.keys(iteration.outputs || {}).find(
+                  key => isImagePath(iteration.outputs[key])
+                );
+                const imagePath = imageOutputKey ? iteration.outputs[imageOutputKey] as string : null;
+
+                return (
+                  <div
+                    key={iteration.iteration}
+                    className={`rounded border p-2 ${
+                      isFinal
+                        ? 'border-green-500/50 bg-green-900/10'
+                        : 'border-gray-700 bg-black/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-medium text-gray-300">
+                        Iteration {iteration.iteration}
+                        {isFinal && (
+                          <span className="ml-2 text-green-400">(Final)</span>
+                        )}
+                      </span>
+                      {iteration.decision && (
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                          iteration.decision.quality === 'excellent' || iteration.decision.quality === 'good'
+                            ? 'bg-green-900/30 text-green-400'
+                            : iteration.decision.quality === 'fair'
+                            ? 'bg-yellow-900/30 text-yellow-400'
+                            : 'bg-red-900/30 text-red-400'
+                        }`}>
+                          {iteration.decision.quality}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Show iteration image */}
+                    {imagePath && (
+                      <div className="relative group mb-2">
+                        <img
+                          src={getStaticUrl(imagePath)}
+                          alt={`Iteration ${iteration.iteration}`}
+                          className="w-full rounded border border-gray-700 cursor-pointer hover:border-orange-500/50 transition-colors"
+                          onClick={() => setExpandedImage(getStaticUrl(imagePath))}
+                        />
+                      </div>
+                    )}
+
+                    {/* Show key parameters that were used */}
+                    {iteration.inputs && Object.keys(iteration.inputs).length > 0 && (
+                      <div className="text-[9px] text-gray-500 space-y-0.5">
+                        {Object.entries(iteration.inputs)
+                          .filter(([key]) => !['input_image', 'output_path'].includes(key))
+                          .slice(0, 4)
+                          .map(([key, value]) => (
+                            <div key={key} className="flex justify-between">
+                              <span className="text-gray-600">{key}:</span>
+                              <span className="text-gray-400">
+                                {typeof value === 'number' ? value.toFixed(2) : String(value).slice(0, 20)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    {/* Show decision reasoning */}
+                    {iteration.decision?.reasoning && (
+                      <p className="text-[9px] text-gray-500 mt-1 italic">
+                        {iteration.decision.reasoning.slice(0, 100)}
+                        {iteration.decision.reasoning.length > 100 && '...'}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

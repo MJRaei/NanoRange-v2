@@ -26,6 +26,39 @@ export interface ExecutionStatusResponse {
   current_step?: string;
   result?: PipelineResultData;
   error?: string;
+  adaptive_mode?: boolean;
+  refinement_info?: RefinementInfo;
+}
+
+export interface RefinementInfo {
+  total_iterations: number;
+  steps_refined: number;
+  tools_removed: number;
+  step_details: Record<string, StepRefinementDetails>;
+}
+
+export interface StepRefinementDetails {
+  step_name: string;
+  tool_id: string;
+  total_iterations: number;
+  final_iteration: number | null;
+  was_removed: boolean;
+  removal_reason?: string;
+  iterations: IterationData[];
+}
+
+export interface IterationData {
+  iteration: number;
+  inputs: Record<string, any>;
+  outputs: Record<string, any>;
+  duration_seconds?: number;
+  decision?: {
+    quality: string;
+    action: string;
+    assessment?: string;
+    reasoning?: string;
+  };
+  artifacts?: Record<string, string>;
 }
 
 export interface PipelineResultData {
@@ -40,6 +73,8 @@ export interface StepResultData {
   status: string;
   outputs: Record<string, any>;
   error_message?: string;
+  iterations?: IterationData[];
+  final_iteration?: number;
 }
 
 export interface PipelineSaveResponse {

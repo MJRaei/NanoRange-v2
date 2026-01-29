@@ -3,8 +3,10 @@ Artifact Manager - Saves and organizes outputs from each refinement iteration.
 
 Provides structured storage for:
 - Images from each iteration of each step
-- Organized by pipeline > step > iteration
+- Organized by session > pipeline > step > iteration
 - Easy retrieval for comparison and debugging
+
+Now uses the same sessions folder structure as normal execution for consistency.
 """
 
 import shutil
@@ -18,42 +20,51 @@ from nanorange import settings
 class ArtifactManager:
     """
     Manages artifacts (images, outputs) from refinement iterations.
-    
-    Storage structure:
+
+    Storage structure (now consistent with FileStore):
     {base_path}/
-        {pipeline_id}/
-            {step_name}/
-                iteration_1/
-                    output_image.jpg
-                    metadata.json
-                iteration_2/
-                    output_image.jpg
-                    metadata.json
-                final/
-                    output_image.jpg
+        sessions/
+            {session_id}/
+                pipelines/
+                    {pipeline_id}/
+                        {step_id}/
+                            iteration_1/
+                                output_image.jpg
+                                metadata.json
+                            iteration_2/
+                                output_image.jpg
+                                metadata.json
+                            final/
+                                output_image.jpg
     """
-    
+
     def __init__(
         self,
-        base_path: Optional[str] = None,
+        session_id: Optional[str] = None,
         pipeline_id: Optional[str] = None,
-        pipeline_name: Optional[str] = None
+        pipeline_name: Optional[str] = None,
+        base_path: Optional[str] = None
     ):
         """
         Initialize the artifact manager.
-        
+
         Args:
-            base_path: Base directory for artifacts (defaults to settings.FILE_STORE_PATH/refinement)
+            session_id: Session identifier (for consistent path with normal execution)
             pipeline_id: Pipeline identifier
             pipeline_name: Human-readable pipeline name
+            base_path: Base directory for artifacts (defaults to settings.FILE_STORE_PATH)
         """
-        self.base_path = Path(base_path or settings.FILE_STORE_PATH) / "refinement"
+        self.base_path = Path(base_path or settings.FILE_STORE_PATH)
+        self.session_id = session_id or datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         self.pipeline_id = pipeline_id or datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         self.pipeline_name = pipeline_name or "unnamed_pipeline"
-        
-        self.pipeline_path = self.base_path / self._sanitize_name(self.pipeline_id)
+
+        self.pipeline_path = (
+            self.base_path / "sessions" / self.session_id / "pipelines" /
+            self._sanitize_name(self.pipeline_id)
+        )
         self.pipeline_path.mkdir(parents=True, exist_ok=True)
-        
+
         self._artifacts: Dict[str, Dict[int, Dict[str, str]]] = {}
     
     def _sanitize_name(self, name: str) -> str:
@@ -287,11 +298,12 @@ class ArtifactManager:
     def get_artifact_summary(self) -> Dict[str, Any]:
         """
         Get a summary of all saved artifacts.
-        
+
         Returns:
             Summary with paths and counts
         """
         summary = {
+            "session_id": self.session_id,
             "pipeline_id": self.pipeline_id,
             "pipeline_name": self.pipeline_name,
             "base_path": str(self.pipeline_path),

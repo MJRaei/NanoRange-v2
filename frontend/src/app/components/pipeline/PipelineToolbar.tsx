@@ -12,20 +12,24 @@ interface PipelineToolbarProps {
   pipelineName: string;
   nodeCount: number;
   executionState: PipelineExecutionState;
+  adaptiveMode: boolean;
   onRun: () => void;
   onClear: () => void;
   onSave?: () => void;
   onNameChange: (name: string) => void;
+  onAdaptiveModeChange: (enabled: boolean) => void;
 }
 
 export function PipelineToolbar({
   pipelineName,
   nodeCount,
   executionState,
+  adaptiveMode,
   onRun,
   onClear,
   onSave,
   onNameChange,
+  onAdaptiveModeChange,
 }: PipelineToolbarProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(pipelineName);
@@ -143,6 +147,34 @@ export function PipelineToolbar({
 
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
+        {/* Adaptive Mode Toggle */}
+        <div className="flex items-center gap-2 mr-2">
+          <label
+            htmlFor="adaptive-mode"
+            className="text-xs text-gray-400 cursor-pointer select-none"
+            title="Adaptive mode uses AI to review outputs and automatically adjust parameters for better results"
+          >
+            Adaptive
+          </label>
+          <button
+            id="adaptive-mode"
+            onClick={() => onAdaptiveModeChange(!adaptiveMode)}
+            disabled={isRunning}
+            className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+              adaptiveMode
+                ? 'bg-orange-500/80'
+                : 'bg-gray-600'
+            } ${isRunning ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+            title={adaptiveMode ? 'Adaptive mode enabled' : 'Enable adaptive mode'}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                adaptiveMode ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
         {/* Clear button */}
         <button
           onClick={onClear}

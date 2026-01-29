@@ -16,6 +16,7 @@ import type {
   Position,
   NodeInputValue,
   PipelineExecutionState,
+  RefinementInfo,
 } from './types';
 
 interface PipelineContextValue {
@@ -23,6 +24,7 @@ interface PipelineContextValue {
   selectedNodeId: string | null;
   selectedNode: PipelineNode | null;
   executionState: PipelineExecutionState;
+  adaptiveMode: boolean;
 
   // Node operations
   addNode: (tool: ToolDefinition, position: Position) => string;
@@ -41,6 +43,7 @@ interface PipelineContextValue {
   setPipelineName: (name: string) => void;
   runPipeline: () => Promise<void>;
   loadPipeline: (pipelineData: Pipeline) => void;
+  setAdaptiveMode: (enabled: boolean) => void;
   setExecutionResults: (executionResult: {
     status: string;
     step_results?: Array<{

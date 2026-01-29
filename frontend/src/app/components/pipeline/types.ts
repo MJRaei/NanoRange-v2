@@ -98,12 +98,43 @@ export interface CanvasState {
 
 export type PipelineStatus = 'idle' | 'running' | 'success' | 'error';
 
+export interface IterationResult {
+  iteration: number;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+  durationSeconds?: number;
+  decision?: {
+    quality: string;
+    action: string;
+    assessment?: string;
+    reasoning?: string;
+  };
+  artifacts?: Record<string, string>;
+}
+
 export interface NodeExecutionResult {
   stepId: string;
   stepName: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   outputs: Record<string, unknown>;
   errorMessage?: string;
+  iterations?: IterationResult[];
+  finalIteration?: number;
+}
+
+export interface RefinementInfo {
+  totalIterations: number;
+  stepsRefined: number;
+  toolsRemoved: number;
+  stepDetails: Record<string, {
+    stepName: string;
+    toolId: string;
+    totalIterations: number;
+    finalIteration: number | null;
+    wasRemoved: boolean;
+    removalReason?: string;
+    iterations: IterationResult[];
+  }>;
 }
 
 export interface PipelineExecutionState {
@@ -112,4 +143,6 @@ export interface PipelineExecutionState {
   results?: Record<string, unknown>;
   nodeResults?: Record<string, NodeExecutionResult>;
   error?: string;
+  adaptiveMode?: boolean;
+  refinementInfo?: RefinementInfo;
 }

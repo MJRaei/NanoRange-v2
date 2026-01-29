@@ -28,6 +28,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
     selectedNodeId,
     selectedNode,
     executionState,
+    adaptiveMode,
     addNode,
     removeNode,
     updateNodePosition,
@@ -38,6 +39,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
     setPipelineName,
     runPipeline,
     loadPipeline,
+    setAdaptiveMode,
     getNodeInputConnections,
     getNodeOutputConnections,
   } = usePipelineContext();
@@ -86,10 +88,12 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
         pipelineName={pipeline.name}
         nodeCount={pipeline.nodes.length}
         executionState={executionState}
+        adaptiveMode={adaptiveMode}
         onRun={runPipeline}
         onClear={clearPipeline}
         onSave={handleSave}
         onNameChange={setPipelineName}
+        onAdaptiveModeChange={setAdaptiveMode}
       />
 
       {/* Main content area */}

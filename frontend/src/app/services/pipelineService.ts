@@ -13,7 +13,6 @@ import type {
   PipelineSaveResponse,
   PipelineSummary,
   SavedPipelinesResponse,
-  PipelineApiError,
 } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -106,17 +105,20 @@ export const pipelineService = {
    *
    * @param pipeline Pipeline to execute
    * @param userInputs Optional user-provided inputs
+   * @param adaptiveMode Enable adaptive/refinement mode
    * @returns Execution response with execution_id
    */
   async executePipeline(
     pipeline: Pipeline,
-    userInputs?: Record<string, Record<string, any>>
+    userInputs?: Record<string, Record<string, any>>,
+    adaptiveMode: boolean = false
   ): Promise<PipelineExecuteResponse> {
     return apiRequest('/api/pipeline/execute', {
       method: 'POST',
       body: JSON.stringify({
         pipeline,
         user_inputs: userInputs,
+        adaptive_mode: adaptiveMode,
       }),
     });
   },

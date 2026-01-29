@@ -19,6 +19,7 @@ from nanorange.core.executor import PipelineExecutor
 from nanorange.core.pipeline import Pipeline, PipelineStep
 from nanorange.core.schemas import StepInput, InputSource, StepStatus
 from nanorange.storage.database import get_session, SavedPipelineModel
+from nanorange.agent.refinement.adaptive_executor import AdaptiveExecutor
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
@@ -52,6 +53,7 @@ class PipelineExecuteRequest(BaseModel):
     pipeline: Dict[str, Any]  # Frontend pipeline structure
     session_id: Optional[str] = None
     user_inputs: Optional[Dict[str, Dict[str, Any]]] = None
+    adaptive_mode: bool = False  # Enable adaptive/refinement mode
 
 
 class PipelineExecuteResponse(BaseModel):
@@ -69,6 +71,8 @@ class ExecutionStatusResponse(BaseModel):
     current_step: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    adaptive_mode: bool = False  # Whether adaptive mode was used
+    refinement_info: Optional[Dict[str, Any]] = None  # Refinement details if adaptive
 
 
 class PipelineSaveRequest(BaseModel):
@@ -361,16 +365,20 @@ async def execute_pipeline(request: PipelineExecuteRequest):
                 "result": None,
                 "error": None,
                 "started_at": datetime.now(),
+                "adaptive_mode": request.adaptive_mode,
+                "refinement_info": None,
             }
 
         # Execute pipeline in background
         session_id = request.session_id or execution_id
-        asyncio.create_task(_execute_pipeline_async(execution_id, pipeline, session_id))
+        asyncio.create_task(_execute_pipeline_async(
+            execution_id, pipeline, session_id, request.adaptive_mode
+        ))
 
         return PipelineExecuteResponse(
             execution_id=execution_id,
             status="running",
-            message="Pipeline execution started"
+            message=f"Pipeline execution started {'(adaptive mode)' if request.adaptive_mode else ''}"
         )
 
     except HTTPException:
@@ -384,7 +392,12 @@ async def execute_pipeline(request: PipelineExecuteRequest):
         )
 
 
-async def _execute_pipeline_async(execution_id: str, pipeline: Pipeline, session_id: str):
+async def _execute_pipeline_async(
+    execution_id: str,
+    pipeline: Pipeline,
+    session_id: str,
+    adaptive_mode: bool = False
+):
     """
     Execute pipeline asynchronously and update execution status.
 
@@ -392,13 +405,47 @@ async def _execute_pipeline_async(execution_id: str, pipeline: Pipeline, session
         execution_id: Execution identifier
         pipeline: Pipeline to execute
         session_id: Session identifier
+        adaptive_mode: Whether to use adaptive/refinement execution
     """
     try:
-        # Create executor
-        executor = PipelineExecutor(registry=get_registry(), session_id=session_id)
+        refinement_info = None
 
-        # Execute pipeline
-        result = executor.execute(pipeline)
+        if adaptive_mode:
+            # Use AdaptiveExecutor for refinement mode
+            executor = AdaptiveExecutor(
+                registry=get_registry(),
+                session_id=session_id,
+                refinement_enabled=True,
+                save_iteration_artifacts=True
+            )
+            result, refinement_report = executor.execute(pipeline)
+
+            # Extract refinement information for UI
+            refinement_info = _extract_refinement_info(refinement_report)
+        else:
+            # Use standard PipelineExecutor
+            executor = PipelineExecutor(registry=get_registry(), session_id=session_id)
+            result = executor.execute(pipeline)
+
+        # Build step results with iteration info if available
+        step_results = []
+        for sr in result.step_results:
+            step_data = {
+                "step_id": sr.step_id,
+                "step_name": sr.step_name,
+                "status": sr.status.value,
+                "outputs": sr.outputs,
+                "error_message": sr.error_message,
+            }
+
+            # Add iteration artifacts if in adaptive mode
+            if adaptive_mode and refinement_info:
+                step_history = refinement_info.get("step_details", {}).get(sr.step_id)
+                if step_history:
+                    step_data["iterations"] = step_history.get("iterations", [])
+                    step_data["final_iteration"] = step_history.get("final_iteration")
+
+            step_results.append(step_data)
 
         # Update execution with result
         async with execution_lock:
@@ -407,20 +454,12 @@ async def _execute_pipeline_async(execution_id: str, pipeline: Pipeline, session
                     "status": "completed" if result.status == StepStatus.COMPLETED else "failed",
                     "progress": 1.0,
                     "result": {
-                        "step_results": [
-                            {
-                                "step_id": sr.step_id,
-                                "step_name": sr.step_name,
-                                "status": sr.status.value,
-                                "outputs": sr.outputs,
-                                "error_message": sr.error_message,
-                            }
-                            for sr in result.step_results
-                        ],
+                        "step_results": step_results,
                         "final_outputs": result.step_results[-1].outputs if result.step_results else {},
                         "total_duration_seconds": result.total_duration_seconds,
                     },
                     "completed_at": datetime.now(),
+                    "refinement_info": refinement_info,
                 })
     except Exception as e:
         import traceback
@@ -434,6 +473,61 @@ async def _execute_pipeline_async(execution_id: str, pipeline: Pipeline, session
                     "error": str(e),
                     "completed_at": datetime.now(),
                 })
+
+
+def _extract_refinement_info(refinement_report) -> Dict[str, Any]:
+    """
+    Extract refinement information from report for UI display.
+
+    Args:
+        refinement_report: The RefinementReport from AdaptiveExecutor
+
+    Returns:
+        Dictionary with refinement details for UI
+    """
+    info = {
+        "total_iterations": refinement_report.total_iterations,
+        "steps_refined": refinement_report.steps_refined,
+        "tools_removed": refinement_report.tools_removed,
+        "step_details": {},
+    }
+
+    for step_id, history in refinement_report.step_histories.items():
+        iterations = []
+        for iteration in history.iterations:
+            iter_data = {
+                "iteration": iteration.iteration,
+                "inputs": iteration.inputs_used,
+                "outputs": iteration.outputs,
+                "duration_seconds": iteration.duration_seconds,
+            }
+
+            # Include decision info if available
+            if iteration.decision:
+                iter_data["decision"] = {
+                    "quality": iteration.decision.quality_score.value,
+                    "action": iteration.decision.action.value,
+                    "assessment": iteration.decision.assessment,
+                    "reasoning": iteration.decision.reasoning,
+                }
+
+            # Include artifact paths
+            if "_iteration_artifacts" in iteration.outputs:
+                iter_data["artifacts"] = iteration.outputs["_iteration_artifacts"]
+
+            iterations.append(iter_data)
+
+        info["step_details"][step_id] = {
+            "step_name": history.step_name,
+            "tool_id": history.tool_id,
+            "total_iterations": history.total_iterations,
+            "final_iteration": history.final_iteration,
+            "was_removed": history.was_removed,
+            "removal_reason": history.removal_reason,
+            "iterations": iterations,
+        }
+
+    return info
 
 
 @router.get("/execution/{execution_id}/status", response_model=ExecutionStatusResponse)
@@ -463,6 +557,8 @@ async def get_execution_status(execution_id: str):
         current_step=execution.get("current_step"),
         result=execution.get("result"),
         error=execution.get("error"),
+        adaptive_mode=execution.get("adaptive_mode", False),
+        refinement_info=execution.get("refinement_info"),
     )
 
 
