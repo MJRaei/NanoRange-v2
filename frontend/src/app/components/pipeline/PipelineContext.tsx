@@ -46,6 +46,7 @@ interface PipelineContextValue {
   setAdaptiveMode: (enabled: boolean) => void;
   setExecutionResults: (executionResult: {
     status: string;
+    adaptive_mode?: boolean;
     step_results?: Array<{
       step_id?: string;
       node_id?: string;

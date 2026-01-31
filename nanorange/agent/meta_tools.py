@@ -616,7 +616,10 @@ def execute_pipeline_adaptive(
     # Build step summaries
     step_summaries = []
     for sr in result.step_results:
+        node_id = f"node_{sr.step_id}"
         step_summaries.append({
+            "step_id": sr.step_id,
+            "node_id": node_id,
             "step_name": sr.step_name,
             "tool_id": sr.tool_id,
             "status": sr.status.value,
@@ -624,11 +627,11 @@ def execute_pipeline_adaptive(
             "outputs": sr.outputs,
             "error": sr.error_message,
         })
-    
-    # Get refinement summary
+
     refinement_summary = refinement_report.get_summary()
-    
-    return {
+
+    global _last_execution_result
+    _last_execution_result = {
         "status": result.status.value,
         "pipeline_name": result.pipeline_name,
         "total_steps": result.total_steps,
@@ -636,6 +639,7 @@ def execute_pipeline_adaptive(
         "failed_steps": result.failed_steps,
         "total_duration_seconds": result.total_duration_seconds,
         "step_results": step_summaries,
+        "adaptive_mode": True,
         "refinement": {
             "enabled": True,
             "total_iterations": refinement_summary["total_iterations"],
@@ -646,6 +650,8 @@ def execute_pipeline_adaptive(
             "pipeline_modifications": refinement_summary["pipeline_modifications"],
         }
     }
+
+    return _last_execution_result
 
 
 def get_refinement_report() -> Dict[str, Any]:

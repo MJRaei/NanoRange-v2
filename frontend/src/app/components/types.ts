@@ -40,6 +40,7 @@ export interface AgentExecutionResult {
   completed_steps?: number;
   failed_steps?: number;
   total_duration_seconds?: number;
+  adaptive_mode?: boolean;  // Flag indicating adaptive mode was used
   step_results?: Array<{
     step_id?: string;
     node_id?: string;

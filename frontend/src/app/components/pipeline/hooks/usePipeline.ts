@@ -55,6 +55,7 @@ interface UsePipelineReturn {
   setAdaptiveMode: (enabled: boolean) => void;
   setExecutionResults: (executionResult: {
     status: string;
+    adaptive_mode?: boolean;
     step_results?: Array<{
       step_id?: string;
       node_id?: string;
@@ -297,6 +298,7 @@ export function usePipeline(): UsePipelineReturn {
   // Set execution results from external source (e.g., agent execution)
   const setExecutionResults = useCallback((executionResult: {
     status: string;
+    adaptive_mode?: boolean;
     step_results?: Array<{
       step_id?: string;
       node_id?: string;
@@ -329,9 +331,15 @@ export function usePipeline(): UsePipelineReturn {
       }
     }
 
+    // If adaptive mode was used, update the toggle state
+    if (executionResult.adaptive_mode) {
+      setAdaptiveMode(true);
+    }
+
     setExecutionState({
       status: frontendStatus as 'idle' | 'running' | 'success' | 'error',
       nodeResults,
+      adaptiveMode: executionResult.adaptive_mode,
     });
   }, []);
 
