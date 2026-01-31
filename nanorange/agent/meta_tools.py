@@ -88,7 +88,8 @@ def _get_adaptive_executor() -> AdaptiveExecutor:
     """Get or create the adaptive executor with refinement support."""
     global _current_adaptive_executor
     if _current_adaptive_executor is None:
-        _current_adaptive_executor = AdaptiveExecutor()
+        session = _get_session()
+        _current_adaptive_executor = AdaptiveExecutor(session_id=session.session_id)
     return _current_adaptive_executor
 
 
@@ -102,11 +103,11 @@ def initialize_session(session_id: Optional[str] = None) -> str:
     Returns:
         The session ID
     """
-    global _current_session, _current_manager, _session_image_path
-    
+    global _current_session, _current_manager, _session_image_path, _current_adaptive_executor
+
     registry = get_registry()
     registry.discover_tools()
-    
+
     if session_id:
         try:
             _current_session = SessionManager(session_id=session_id)
@@ -120,8 +121,10 @@ def initialize_session(session_id: Optional[str] = None) -> str:
         _current_session.create_session()
         # Clear image path for new sessions
         _session_image_path = None
-    
+
     _current_manager = PipelineManager()
+    # Reset executor so it gets the new session_id
+    _current_adaptive_executor = None
     return _current_session.session_id
 
 
