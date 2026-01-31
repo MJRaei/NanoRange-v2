@@ -613,11 +613,10 @@ def execute_pipeline_adaptive(
     session.save_pipeline(manager.current_pipeline)
     session.save_result(result)
     
-    # Build step summaries
     step_summaries = []
     for sr in result.step_results:
         node_id = f"node_{sr.step_id}"
-        step_summaries.append({
+        step_summary = {
             "step_id": sr.step_id,
             "node_id": node_id,
             "step_name": sr.step_name,
@@ -626,7 +625,31 @@ def execute_pipeline_adaptive(
             "duration_seconds": sr.duration_seconds,
             "outputs": sr.outputs,
             "error": sr.error_message,
-        })
+        }
+
+        if sr.step_id in refinement_report.step_histories:
+            history = refinement_report.step_histories[sr.step_id]
+            step_summary["iterations"] = []
+            for iteration in history.iterations:
+                iter_data = {
+                    "iteration": iteration.iteration,
+                    "inputs": iteration.inputs_used,
+                    "outputs": iteration.outputs,
+                    "duration_seconds": iteration.duration_seconds,
+                }
+                if iteration.decision:
+                    iter_data["decision"] = {
+                        "quality": iteration.decision.quality_score.value,
+                        "action": iteration.decision.action.value,
+                        "assessment": iteration.decision.assessment,
+                        "reasoning": iteration.decision.reasoning,
+                    }
+                if "_iteration_artifacts" in iteration.outputs:
+                    iter_data["artifacts"] = iteration.outputs["_iteration_artifacts"]
+                step_summary["iterations"].append(iter_data)
+            step_summary["final_iteration"] = history.final_iteration
+
+        step_summaries.append(step_summary)
 
     refinement_summary = refinement_report.get_summary()
 

@@ -32,6 +32,21 @@ export interface AnalysisImages {
   size_distribution_html?: string;
 }
 
+// Iteration result from adaptive mode execution
+export interface AgentIterationResult {
+  iteration: number;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+  duration_seconds?: number;
+  decision?: {
+    quality: string;
+    action: string;
+    assessment?: string;
+    reasoning?: string;
+  };
+  artifacts?: Record<string, string>;
+}
+
 // Execution result from agent pipeline execution
 export interface AgentExecutionResult {
   status: string;
@@ -50,6 +65,8 @@ export interface AgentExecutionResult {
     duration_seconds?: number;
     outputs?: Record<string, unknown>;
     error?: string;
+    iterations?: AgentIterationResult[];  // All iterations in adaptive mode
+    final_iteration?: number;  // Which iteration was the final accepted one
   }>;
 }
 

@@ -54,6 +54,20 @@ interface PipelineContextValue {
       status: string;
       outputs?: Record<string, unknown>;
       error?: string;
+      iterations?: Array<{
+        iteration: number;
+        inputs: Record<string, unknown>;
+        outputs: Record<string, unknown>;
+        duration_seconds?: number;
+        decision?: {
+          quality: string;
+          action: string;
+          assessment?: string;
+          reasoning?: string;
+        };
+        artifacts?: Record<string, string>;
+      }>;
+      final_iteration?: number;
     }>;
   }) => void;
 

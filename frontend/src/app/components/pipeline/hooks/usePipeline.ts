@@ -63,6 +63,20 @@ interface UsePipelineReturn {
       status: string;
       outputs?: Record<string, unknown>;
       error?: string;
+      iterations?: Array<{
+        iteration: number;
+        inputs: Record<string, unknown>;
+        outputs: Record<string, unknown>;
+        duration_seconds?: number;
+        decision?: {
+          quality: string;
+          action: string;
+          assessment?: string;
+          reasoning?: string;
+        };
+        artifacts?: Record<string, string>;
+      }>;
+      final_iteration?: number;
     }>;
   }) => void;
 
@@ -306,6 +320,20 @@ export function usePipeline(): UsePipelineReturn {
       status: string;
       outputs?: Record<string, unknown>;
       error?: string;
+      iterations?: Array<{
+        iteration: number;
+        inputs: Record<string, unknown>;
+        outputs: Record<string, unknown>;
+        duration_seconds?: number;
+        decision?: {
+          quality: string;
+          action: string;
+          assessment?: string;
+          reasoning?: string;
+        };
+        artifacts?: Record<string, string>;
+      }>;
+      final_iteration?: number;
     }>;
   }) => {
     const frontendStatus =
@@ -326,6 +354,16 @@ export function usePipeline(): UsePipelineReturn {
             status: stepResult.status as 'pending' | 'running' | 'completed' | 'failed',
             outputs: stepResult.outputs || {},
             errorMessage: stepResult.error,
+            // Map iterations data for adaptive mode
+            iterations: stepResult.iterations?.map(iter => ({
+              iteration: iter.iteration,
+              inputs: iter.inputs,
+              outputs: iter.outputs,
+              durationSeconds: iter.duration_seconds,
+              decision: iter.decision,
+              artifacts: iter.artifacts,
+            })),
+            finalIteration: stepResult.final_iteration,
           };
         }
       }
