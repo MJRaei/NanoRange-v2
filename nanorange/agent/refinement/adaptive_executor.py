@@ -34,6 +34,7 @@ from nanorange.agent.refinement.image_reviewer import ImageReviewer
 from nanorange.agent.refinement.parameter_optimizer import ParameterOptimizer
 from nanorange.agent.refinement.refinement_tracker import RefinementTracker
 from nanorange.agent.refinement.artifact_manager import ArtifactManager
+from nanorange.storage.file_store import FileStore
 from nanorange import settings
 
 
@@ -113,6 +114,8 @@ class AdaptiveExecutor:
         self.optimizer = optimizer or ParameterOptimizer()
         self.user_input_handler = user_input_handler
         self.session_id = session_id
+        self.file_store = FileStore()
+        self.current_pipeline_id: Optional[str] = None
 
         self.refinement_enabled = (
             refinement_enabled if refinement_enabled is not None
@@ -140,6 +143,8 @@ class AdaptiveExecutor:
         Returns:
             Tuple of (PipelineResult, RefinementReport)
         """
+        self.current_pipeline_id = pipeline.pipeline_id
+
         artifact_manager = None
         if self.save_iteration_artifacts:
             artifact_manager = ArtifactManager(
@@ -284,8 +289,25 @@ class AdaptiveExecutor:
         current_inputs = resolved_inputs.copy()
         final_result = None
         was_removed = False
-        
+
+        schema = self.registry.get_schema(step.tool_id)
+
         while iteration <= self.max_iterations:
+            if schema:
+                for inp in schema.inputs:
+                    if inp.name == "output_path":
+                        step_dir_name = self._get_step_dir_name(step)
+                        extension = "json" if step.tool_id == "find_contours" else "png"
+                        output_path = self.file_store.generate_output_path(
+                            session_id=self.session_id,
+                            pipeline_id=context.pipeline.pipeline_id,
+                            step_id=step_dir_name,
+                            output_name=f"output_iter{iteration}",
+                            extension=extension
+                        )
+                        current_inputs["output_path"] = str(output_path)
+                        break
+
             start_time = datetime.utcnow()
             step_result = self._execute_single_iteration(
                 step=step,
@@ -436,10 +458,43 @@ class AdaptiveExecutor:
                     )
             
             outputs = implementation(**inputs)
-            
+
             if not isinstance(outputs, dict):
                 outputs = {"result": outputs}
-            
+
+            step_dir_name = self._get_step_dir_name(step)
+
+            if step.tool_id == "load_image" and "image_path" in inputs:
+                try:
+                    source_path = inputs["image_path"]
+                    session_path = self.file_store.save_file(
+                        source_path=source_path,
+                        session_id=self.session_id,
+                        pipeline_id=self.current_pipeline_id,
+                        step_id=step_dir_name,
+                        output_name="input",
+                        copy=True
+                    )
+                    if "image" in outputs:
+                        outputs["image"] = session_path
+                except Exception as e:
+                    print(f"Warning: Failed to copy load_image input to session: {e}")
+
+            elif step.tool_id == "save_image" and "saved_path" in outputs:
+                try:
+                    saved_path = outputs["saved_path"]
+                    session_path = self.file_store.save_file(
+                        source_path=saved_path,
+                        session_id=self.session_id,
+                        pipeline_id=self.current_pipeline_id,
+                        step_id=step_dir_name,
+                        output_name="output",
+                        copy=True
+                    )
+                    outputs["saved_path"] = session_path
+                except Exception as e:
+                    print(f"Warning: Failed to copy save_image output to session: {e}")
+
             result.outputs = outputs
             result.status = StepStatus.COMPLETED
             
@@ -457,6 +512,18 @@ class AdaptiveExecutor:
         
         return result
     
+    def _get_step_dir_name(self, step: PipelineStep) -> str:
+        """
+        Generate a consistent directory name for a step.
+
+        Uses the same sanitization as ArtifactManager to ensure files go into
+        the same folder structure.
+        """
+        name = step.step_name
+        sanitized = name.replace(" ", "_").replace("/", "-").replace("\\", "-")
+        sanitized = "".join(c for c in sanitized if c.isalnum() or c in "_-.")
+        return sanitized[:100]
+
     def _resolve_inputs(
         self,
         step: PipelineStep,
@@ -499,7 +566,29 @@ class AdaptiveExecutor:
                         f"User input required for {input_name} "
                         "but no handler provided"
                     )
-        
+
+        if schema:
+            for inp in schema.inputs:
+                if inp.name == "output_path":
+                    if step.tool_id == "save_image" and "output_path" in resolved:
+                        continue
+
+                    extension = "png"
+                    if step.tool_id == "find_contours":
+                        extension = "json"
+
+                    step_dir_name = self._get_step_dir_name(step)
+
+                    output_path = self.file_store.generate_output_path(
+                        session_id=self.session_id,
+                        pipeline_id=context.pipeline.pipeline_id,
+                        step_id=step_dir_name,
+                        output_name="output",
+                        extension=extension
+                    )
+
+                    resolved["output_path"] = str(output_path)
+
         return resolved
     
     def _has_image_output(
