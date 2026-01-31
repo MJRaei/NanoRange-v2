@@ -58,6 +58,7 @@ class RefinementTracker:
         self._artifact_manager = artifact_manager
         self._current_step_id: Optional[str] = None
         self._current_step_name: Optional[str] = None
+        self._current_step_dir_name: Optional[str] = None
     
     def start_execution(self) -> None:
         """Mark the start of pipeline execution."""
@@ -76,16 +77,18 @@ class RefinementTracker:
         step_id: str,
         step_name: str,
         tool_id: str,
-        user_locked_params: List[str]
+        user_locked_params: List[str],
+        step_dir_name: Optional[str] = None
     ) -> None:
         """
         Start tracking a new step.
-        
+
         Args:
             step_id: Step ID
             step_name: Human-readable name
             tool_id: Tool being used
             user_locked_params: Parameters that shouldn't be changed
+            step_dir_name: Directory name for artifacts (uses step_name if not provided)
         """
         self._current_step_history = StepRefinementHistory(
             step_id=step_id,
@@ -95,6 +98,7 @@ class RefinementTracker:
         )
         self._current_step_id = step_id
         self._current_step_name = step_name
+        self._current_step_dir_name = step_dir_name or step_name
         self.report.total_steps_executed += 1
     
     def record_iteration(
@@ -128,11 +132,11 @@ class RefinementTracker:
         if self._artifact_manager and outputs and self._current_step_id:
             saved_artifacts = self._artifact_manager.save_iteration_outputs(
                 step_id=self._current_step_id,
-                step_name=self._current_step_name or self._current_step_id,
+                step_dir_name=self._current_step_dir_name or self._current_step_id,
                 iteration=iteration,
                 outputs=outputs
             )
-            
+
             metadata = {
                 "iteration": iteration,
                 "inputs": inputs_used,
@@ -149,7 +153,7 @@ class RefinementTracker:
                 }
             self._artifact_manager.save_metadata(
                 step_id=self._current_step_id,
-                step_name=self._current_step_name or self._current_step_id,
+                step_dir_name=self._current_step_dir_name or self._current_step_id,
                 iteration=iteration,
                 metadata=metadata
             )
@@ -193,19 +197,20 @@ class RefinementTracker:
         self._current_step_history.was_removed = was_removed
         self._current_step_history.removal_reason = removal_reason
         
-        if (self._artifact_manager and 
-            accepted_iteration is not None and 
+        if (self._artifact_manager and
+            accepted_iteration is not None and
             self._current_step_id):
             self._artifact_manager.mark_final(
                 step_id=self._current_step_id,
-                step_name=self._current_step_name or self._current_step_id,
+                step_dir_name=self._current_step_dir_name or self._current_step_id,
                 final_iteration=accepted_iteration
             )
-        
+
         self.report.add_step_history(self._current_step_history)
         self._current_step_history = None
         self._current_step_id = None
         self._current_step_name = None
+        self._current_step_dir_name = None
     
     def record_tool_removal(
         self,

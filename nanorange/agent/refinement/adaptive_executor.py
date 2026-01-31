@@ -269,9 +269,11 @@ class AdaptiveExecutor:
             resolved_inputs, tool_schema
         ) if tool_schema else []
         
+        step_dir_name = self._get_step_dir_name(step)
         tracker.start_step(
             step_id=step.step_id,
             step_name=step.step_name,
+            step_dir_name=step_dir_name,
             tool_id=step.tool_id,
             user_locked_params=user_locked_params
         )
@@ -516,13 +518,25 @@ class AdaptiveExecutor:
         """
         Generate a consistent directory name for a step.
 
-        Uses the same sanitization as ArtifactManager to ensure files go into
-        the same folder structure.
+        Uses tool_id (which is consistent across both UI and agent execution)
+        plus a normalized suffix from step_id for uniqueness.
+
+        This matches the Core PipelineExecutor to ensure consistent folder naming
+        between normal and adaptive execution modes.
+
+        Examples:
+          - threshold_abc12345
+          - load_image_xyz98765
         """
-        name = step.step_name
-        sanitized = name.replace(" ", "_").replace("/", "-").replace("\\", "-")
-        sanitized = "".join(c for c in sanitized if c.isalnum() or c in "_-.")
-        return sanitized[:100]
+        safe_tool_id = "".join(c if c.isalnum() else "_" for c in step.tool_id)
+
+        step_id = step.step_id
+        if step_id.startswith("node_"):
+            step_id_suffix = step_id[5:13]
+        else:
+            step_id_suffix = step_id.replace("-", "")[:8]
+
+        return f"{safe_tool_id}_{step_id_suffix}"
 
     def _resolve_inputs(
         self,
