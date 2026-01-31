@@ -43,12 +43,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
         {/* Message Content */}
         <div
-          className={`px-4 py-3 rounded-2xl ${isUser ? "rounded-br-md" : "rounded-bl-md"} ${!isUser ? "markdown-content" : ""}`}
+          className={`px-4 py-3 rounded-2xl ${isUser ? "rounded-br-md" : "rounded-bl-md"} ${!isUser ? "markdown-content" : ""} overflow-x-auto max-w-full`}
           style={{
             backgroundColor: isUser
               ? "rgba(255, 107, 53, 0.15)"
               : "rgba(196, 184, 168, 0.08)",
             color: isUser ? "#f5f0e8" : "#c4b8a8",
+            overflowWrap: "anywhere",
+            wordBreak: "break-word",
           }}
         >
           {isUser ? (
