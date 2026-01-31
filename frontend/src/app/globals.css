@@ -497,3 +497,22 @@ a:focus-visible {
 .markdown-content hr {
   opacity: 0.5;
 }
+
+/* ===== Landing Page Styles ===== */
+
+/* Feature cards */
+.feature-card {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 107, 53, 0.3) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* CTA button hover effects */
+.cta-button:hover {
+  background: linear-gradient(135deg, #ff8c5a 0%, #ff6b35 100%) !important;
+  box-shadow: 0 8px 30px rgba(255, 107, 53, 0.5) !important;
+}
