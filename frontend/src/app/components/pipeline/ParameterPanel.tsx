@@ -286,7 +286,6 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
                     <label className="block text-xs font-medium text-gray-300">
                       {input.name}
                       {input.required && <span className="text-red-400 ml-0.5">*</span>}
-                      <span className="text-[10px] text-gray-600 ml-2">{input.type}</span>
                     </label>
                     {isConnected ? (
                       <div className="px-3 py-2 rounded text-xs bg-green-900/20 border border-green-500/30">
@@ -369,7 +368,6 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
                 <div key={output.name} className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-300">{output.name}</span>
-                    <span className="text-gray-600">{output.type}</span>
                   </div>
 
                   {/* Show output image if available */}

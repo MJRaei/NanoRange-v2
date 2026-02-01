@@ -242,9 +242,6 @@ export function PipelineNode({
                 <span className="text-xs text-gray-400">
                   {input.name}
                 </span>
-                <span className="text-[10px] text-gray-600 ml-auto">
-                  {input.type}
-                </span>
               </div>
             ))}
           </div>
@@ -261,9 +258,6 @@ export function PipelineNode({
                 key={output.name}
                 className="flex items-center gap-2 justify-end"
               >
-                <span className="text-[10px] text-gray-600">
-                  {output.type}
-                </span>
                 <span className="text-xs text-gray-400">{output.name}</span>
               </div>
             ))}
