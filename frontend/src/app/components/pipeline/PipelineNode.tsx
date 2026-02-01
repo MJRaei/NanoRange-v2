@@ -34,6 +34,7 @@ const categoryColors: Record<string, string> = {
   io: '#3b82f6',
   preprocessing: '#8b5cf6',
   segmentation: '#ec4899',
+  ml_segmentation: '#c026d3',
   measurement: '#10b981',
   ml: '#f59e0b',
   vlm: '#6366f1',
