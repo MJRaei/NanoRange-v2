@@ -174,7 +174,6 @@ export function ToolPalette({ onToolSelect }: ToolPaletteProps) {
               <span className="text-xs font-medium text-gray-300">
                 {categoryLabels[category] || category}
               </span>
-              <span className="text-xs text-gray-500 ml-auto">{tools.length}</span>
             </button>
 
             {/* Tools in category */}
