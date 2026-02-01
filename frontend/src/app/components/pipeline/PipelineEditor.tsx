@@ -12,9 +12,15 @@ import { ToolPalette } from './ToolPalette';
 import { SavedPipelinesPanel } from './SavedPipelinesPanel';
 import { ParameterPanel } from './ParameterPanel';
 import { PipelineToolbar } from './PipelineToolbar';
+import { Toast } from '../ui/Toast';
 import { usePipelineContext } from './PipelineContext';
 import { pipelineService } from '../../services/pipelineService';
 import type { ToolDefinition, Position, Pipeline } from './types';
+
+interface ToastState {
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 type LeftPanelTab = 'tools' | 'saved';
 
@@ -49,6 +55,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
   const [leftPanelTab, setLeftPanelTab] = useState<LeftPanelTab>('tools');
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const handleDropTool = useCallback(
     (tool: ToolDefinition, position: Position) => {
@@ -63,15 +70,11 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
 
   const handleSave = useCallback(async () => {
     try {
-      const pipelineId = await pipelineService.savePipeline(
-        pipeline,
-        pipeline.name
-      );
-      console.log('Pipeline saved successfully:', pipelineId);
-      // TODO: Show success toast/notification
+      await pipelineService.savePipeline(pipeline, pipeline.name);
+      setToast({ message: 'Pipeline saved successfully', type: 'success' });
     } catch (error) {
       console.error('Failed to save pipeline:', error);
-      // TODO: Show error toast/notification
+      setToast({ message: 'Failed to save pipeline', type: 'error' });
     }
   }, [pipeline]);
 
@@ -83,6 +86,15 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
 
   return (
     <div className={`flex flex-col h-full ${className}`} style={{ backgroundColor: '#0a0908' }}>
+      {/* Toast notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
       {/* Toolbar */}
       <PipelineToolbar
         pipelineName={pipeline.name}
