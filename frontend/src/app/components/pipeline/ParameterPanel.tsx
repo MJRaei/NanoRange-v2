@@ -8,10 +8,36 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import type { PipelineNode, NodeInputValue, DataType, PipelineEdge, PipelineExecutionState, IterationResult } from './types';
+import type { PipelineNode, NodeInputValue, DataType, PipelineEdge, PipelineExecutionState } from './types';
 import { isConnectableType, getInputSatisfactionStatus } from './utils/connectionUtils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const TRUNCATE_LENGTH = 100;
+
+function ExpandableText({ text, maxLength = TRUNCATE_LENGTH }: { text: string; maxLength?: number }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const needsTruncation = text.length > maxLength;
+
+  if (!needsTruncation) {
+    return <span>{text}</span>;
+  }
+
+  return (
+    <span>
+      {isExpanded ? text : `${text.slice(0, maxLength)}...`}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsExpanded(!isExpanded);
+        }}
+        className="ml-1 text-gray-400 hover:text-gray-300 underline"
+      >
+        {isExpanded ? 'See less' : 'See more'}
+      </button>
+    </span>
+  );
+}
 
 interface ParameterPanelProps {
   node: PipelineNode | null;
@@ -498,8 +524,7 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
                     {/* Show decision reasoning */}
                     {iteration.decision?.reasoning && (
                       <p className="text-[9px] text-gray-500 mt-1 italic">
-                        {iteration.decision.reasoning.slice(0, 100)}
-                        {iteration.decision.reasoning.length > 100 && '...'}
+                        <ExpandableText text={iteration.decision.reasoning} />
                       </p>
                     )}
                   </div>
