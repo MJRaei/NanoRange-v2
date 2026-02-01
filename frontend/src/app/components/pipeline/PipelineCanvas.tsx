@@ -36,6 +36,15 @@ interface PipelineCanvasProps {
   getNodeOutputConnections: (nodeId: string) => PipelineEdge[];
 }
 
+// Expansion state for node sections
+interface NodeExpansionState {
+  params: boolean;
+  outputs: boolean;
+}
+
+// Maximum items to show when collapsed
+const MAX_VISIBLE_ITEMS = 2;
+
 interface DragState {
   type: 'node' | 'connection' | null;
   nodeId?: string;
@@ -74,6 +83,60 @@ export function PipelineCanvas({
   } | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [snapTargetNodeId, setSnapTargetNodeId] = useState<string | null>(null);
+  const [nodeExpansion, setNodeExpansion] = useState<Record<string, NodeExpansionState>>({});
+
+  // Get expansion state for a node (defaults to collapsed)
+  const getNodeExpansion = useCallback((nodeId: string): NodeExpansionState => {
+    return nodeExpansion[nodeId] || { params: false, outputs: false };
+  }, [nodeExpansion]);
+
+  // Toggle expansion state for a node section
+  const toggleNodeExpansion = useCallback((nodeId: string, section: 'params' | 'outputs') => {
+    setNodeExpansion(prev => ({
+      ...prev,
+      [nodeId]: {
+        ...prev[nodeId] || { params: false, outputs: false },
+        [section]: !(prev[nodeId]?.[section] ?? false)
+      }
+    }));
+  }, []);
+
+  // Calculate node height based on its content and expansion state
+  const getNodeHeight = useCallback((node: typeof pipeline.nodes[0]): number => {
+    const portConfig = getPortConfig(node.tool);
+    const expansion = getNodeExpansion(node.id);
+    let height = NODE_HEADER_HEIGHT + NODE_TITLE_HEIGHT;
+
+    // Connectable input row (with py-1.5 padding)
+    if (portConfig.hasInputPort) {
+      height += NODE_CONNECTABLE_ROW;
+    }
+
+    // Non-connectable inputs (parameters section)
+    const parameterInputs = node.tool.inputs.filter(i =>
+      !['IMAGE', 'MASK', 'ARRAY'].includes(i.type)
+    );
+    if (parameterInputs.length > 0) {
+      const visibleParams = expansion.params ? parameterInputs.length : Math.min(parameterInputs.length, MAX_VISIBLE_ITEMS);
+      const hasMoreParams = parameterInputs.length > MAX_VISIBLE_ITEMS;
+      height += NODE_SECTION_PADDING + NODE_SECTION_HEADER + visibleParams * NODE_ROW_HEIGHT;
+      if (hasMoreParams) {
+        height += NODE_ROW_HEIGHT; // "Show more/less" button
+      }
+    }
+
+    // Outputs section
+    if (node.tool.outputs.length > 0) {
+      const visibleOutputs = expansion.outputs ? node.tool.outputs.length : Math.min(node.tool.outputs.length, MAX_VISIBLE_ITEMS);
+      const hasMoreOutputs = node.tool.outputs.length > MAX_VISIBLE_ITEMS;
+      height += NODE_SECTION_PADDING + NODE_SECTION_HEADER + visibleOutputs * NODE_ROW_HEIGHT;
+      if (hasMoreOutputs) {
+        height += NODE_ROW_HEIGHT; // "Show more/less" button
+      }
+    }
+
+    return height;
+  }, [getNodeExpansion]);
 
   // Find the closest node with a valid input port within snap radius
   const findSnapTarget = useCallback(
@@ -89,21 +152,8 @@ export function PipelineCanvas({
         const portConfig = getPortConfig(node.tool);
         if (!portConfig.hasInputPort) continue;
 
-        // Calculate node height to find input port position (vertically centered on left side)
-        const nodeHeight = (() => {
-          let height = NODE_HEADER_HEIGHT + NODE_TITLE_HEIGHT;
-          if (portConfig.hasInputPort) height += NODE_CONNECTABLE_ROW;
-          const parameterInputs = node.tool.inputs.filter(
-            (i) => !['IMAGE', 'MASK', 'ARRAY'].includes(i.type)
-          );
-          if (parameterInputs.length > 0) {
-            height += NODE_SECTION_PADDING + NODE_SECTION_HEADER + parameterInputs.length * NODE_ROW_HEIGHT;
-          }
-          if (node.tool.outputs.length > 0) {
-            height += NODE_SECTION_PADDING + NODE_SECTION_HEADER + node.tool.outputs.length * NODE_ROW_HEIGHT;
-          }
-          return height;
-        })();
+        // Use the same height calculation as getNodeHeight
+        const nodeHeight = getNodeHeight(node);
 
         // Input port is on the left side, vertically centered
         const portX = node.position.x;
@@ -122,34 +172,8 @@ export function PipelineCanvas({
 
       return closestNodeId;
     },
-    [pipeline.nodes]
+    [pipeline.nodes, getNodeHeight]
   );
-
-  // Calculate node height based on its content
-  const getNodeHeight = useCallback((node: typeof pipeline.nodes[0]): number => {
-    const portConfig = getPortConfig(node.tool);
-    let height = NODE_HEADER_HEIGHT + NODE_TITLE_HEIGHT;
-
-    // Connectable input row (with py-1.5 padding)
-    if (portConfig.hasInputPort) {
-      height += NODE_CONNECTABLE_ROW;
-    }
-
-    // Non-connectable inputs (parameters section)
-    const parameterInputs = node.tool.inputs.filter(i =>
-      !['IMAGE', 'MASK', 'ARRAY'].includes(i.type)
-    );
-    if (parameterInputs.length > 0) {
-      height += NODE_SECTION_PADDING + NODE_SECTION_HEADER + parameterInputs.length * NODE_ROW_HEIGHT;
-    }
-
-    // Outputs section
-    if (node.tool.outputs.length > 0) {
-      height += NODE_SECTION_PADDING + NODE_SECTION_HEADER + node.tool.outputs.length * NODE_ROW_HEIGHT;
-    }
-
-    return height;
-  }, []);
 
   // Handle node dragging
   const handleNodeDragStart = useCallback(
@@ -407,6 +431,8 @@ export function PipelineCanvas({
           inputConnections={getNodeInputConnections(node.id)}
           outputConnections={getNodeOutputConnections(node.id)}
           isInputPortHovered={(hoveredNodeId === node.id || snapTargetNodeId === node.id) && pendingConnection !== null}
+          expansion={getNodeExpansion(node.id)}
+          onToggleExpansion={(section) => toggleNodeExpansion(node.id, section)}
           onSelect={onSelectNode}
           onDelete={onDeleteNode}
           onDragStart={handleNodeDragStart}

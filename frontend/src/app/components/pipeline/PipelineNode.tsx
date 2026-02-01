@@ -16,6 +16,14 @@ import {
   type SatisfactionStatus,
 } from './utils/connectionUtils';
 
+interface ExpansionState {
+  params: boolean;
+  outputs: boolean;
+}
+
+// Maximum items to show when collapsed
+const MAX_VISIBLE_ITEMS = 2;
+
 interface PipelineNodeProps {
   node: PipelineNodeType;
   isSelected: boolean;
@@ -23,6 +31,8 @@ interface PipelineNodeProps {
   inputConnections: PipelineEdge[];
   outputConnections: PipelineEdge[];
   isInputPortHovered?: boolean;
+  expansion: ExpansionState;
+  onToggleExpansion: (section: 'params' | 'outputs') => void;
   onSelect: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onDragStart: (nodeId: string, e: ReactMouseEvent) => void;
@@ -63,6 +73,8 @@ export function PipelineNode({
   inputConnections,
   outputConnections,
   isInputPortHovered,
+  expansion,
+  onToggleExpansion,
   onSelect,
   onDelete,
   onDragStart,
@@ -228,13 +240,13 @@ export function PipelineNode({
           </div>
         )}
 
-        {/* Other Inputs (non-connectable) */}
+        {/* Other Inputs (non-connectable) - Collapsible */}
         {displayInputs.length > 0 && (
           <div className="px-3 py-2 space-y-1">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider">
               Parameters
             </span>
-            {displayInputs.map((input) => (
+            {(expansion.params ? displayInputs : displayInputs.slice(0, MAX_VISIBLE_ITEMS)).map((input) => (
               <div
                 key={input.name}
                 className="flex items-center gap-2"
@@ -245,16 +257,35 @@ export function PipelineNode({
                 </span>
               </div>
             ))}
+            {displayInputs.length > MAX_VISIBLE_ITEMS && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpansion('params');
+                }}
+                className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1 mt-1"
+              >
+                <svg
+                  className={`w-3 h-3 transition-transform ${expansion.params ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                {expansion.params ? 'Show less' : `+${displayInputs.length - MAX_VISIBLE_ITEMS} more`}
+              </button>
+            )}
           </div>
         )}
 
-        {/* Outputs (no circles, just info) */}
+        {/* Outputs (no circles, just info) - Collapsible */}
         {node.tool.outputs.length > 0 && (
           <div className="px-3 py-2 space-y-1 border-t border-white/5">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider">
               Outputs
             </span>
-            {node.tool.outputs.map((output) => (
+            {(expansion.outputs ? node.tool.outputs : node.tool.outputs.slice(0, MAX_VISIBLE_ITEMS)).map((output) => (
               <div
                 key={output.name}
                 className="flex items-center gap-2 justify-end"
@@ -262,6 +293,25 @@ export function PipelineNode({
                 <span className="text-xs text-gray-400">{output.name}</span>
               </div>
             ))}
+            {node.tool.outputs.length > MAX_VISIBLE_ITEMS && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpansion('outputs');
+                }}
+                className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1 mt-1 ml-auto"
+              >
+                <svg
+                  className={`w-3 h-3 transition-transform ${expansion.outputs ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                {expansion.outputs ? 'Show less' : `+${node.tool.outputs.length - MAX_VISIBLE_ITEMS} more`}
+              </button>
+            )}
           </div>
         )}
 
