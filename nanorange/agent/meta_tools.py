@@ -518,10 +518,6 @@ def execute_pipeline(
         user_inputs=user_inputs,
         stop_on_error=stop_on_error
     )
-    
-    session = _get_session()
-    session.save_pipeline(manager.current_pipeline)
-    session.save_result(result)
 
     step_summaries = []
     for sr in result.step_results:
@@ -607,12 +603,7 @@ def execute_pipeline_adaptive(
     
     # Store for later retrieval
     _last_refinement_report = refinement_report
-    
-    # Save results
-    session = _get_session()
-    session.save_pipeline(manager.current_pipeline)
-    session.save_result(result)
-    
+
     step_summaries = []
     for sr in result.step_results:
         node_id = f"node_{sr.step_id}"
