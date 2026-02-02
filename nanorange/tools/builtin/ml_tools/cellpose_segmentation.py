@@ -193,7 +193,7 @@ def cellpose_segment(
     cellprob_threshold: float = 0.0,
     use_gpu: bool = True,
     min_size: int = 15,
-    output_dir: Optional[str] = None,
+    output_path: Optional[str] = None,
     overlay_alpha: float = 0.5,
 ) -> Dict[str, Any]:
     """
@@ -230,8 +230,8 @@ def cellpose_segment(
         use_gpu: Whether to use GPU acceleration if available.
         min_size: Minimum object size in pixels. Objects smaller than this
             are removed. Default 15.
-        output_dir: Directory to save outputs. Defaults to a subfolder
-            in the same directory as the input image.
+        output_path: Path for output files. The parent directory will be used
+            to save all outputs.
         overlay_alpha: Transparency of the overlay (0-1). Default 0.5.
     
     Returns:
@@ -258,10 +258,10 @@ def cellpose_segment(
     if not source_path.exists():
         raise FileNotFoundError(f"Image not found: {image_path}")
     
-    if output_dir is None:
+    if output_path is None:
         output_dir = source_path.parent / f"cellpose_{model_type}_results"
     else:
-        output_dir = Path(output_dir)
+        output_dir = Path(output_path).parent
     output_dir.mkdir(parents=True, exist_ok=True)
     
     image = np.array(Image.open(source_path))
@@ -442,9 +442,9 @@ CELLPOSE_SEGMENT_SCHEMA = ToolSchema(
             max_value=1000,
         ),
         InputSchema(
-            name="output_dir",
+            name="output_path",
             type=DataType.PATH,
-            description="Output directory path. Defaults to subfolder of input image.",
+            description="Output path. Parent directory will be used for all outputs.",
             required=False,
         ),
         InputSchema(
