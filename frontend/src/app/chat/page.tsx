@@ -408,7 +408,7 @@ function ChatView() {
                 onKeyDown={handleKeyDown}
                 placeholder="Describe your analysis request..."
                 rows={1}
-                className="flex-1 bg-transparent border-none outline-none resize-none text-base leading-relaxed"
+                className="flex-1 bg-transparent border-none outline-none resize-none text-base leading-relaxed chat-textarea"
                 style={{
                   color: "#f5f0e8",
                   fontFamily: "'JetBrains Mono', monospace",

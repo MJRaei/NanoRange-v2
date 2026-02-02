@@ -207,22 +207,37 @@ body {
   animation: fadeInUp 0.3s ease-out forwards;
 }
 
+.chat-scroll {
+  overflow-x: hidden;
+}
+
 /* Custom scrollbar for chat */
-.chat-scroll::-webkit-scrollbar {
+.chat-scroll::-webkit-scrollbar,
+.chat-textarea::-webkit-scrollbar {
   width: 6px;
 }
 
-.chat-scroll::-webkit-scrollbar-track {
+.chat-scroll::-webkit-scrollbar-track,
+.chat-textarea::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.chat-scroll::-webkit-scrollbar-thumb {
+.chat-scroll::-webkit-scrollbar-thumb,
+.chat-textarea::-webkit-scrollbar-thumb {
   background: rgba(255, 107, 53, 0.2);
   border-radius: 3px;
 }
 
-.chat-scroll::-webkit-scrollbar-thumb:hover {
+.chat-scroll::-webkit-scrollbar-thumb:hover,
+.chat-textarea::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 107, 53, 0.4);
+}
+
+/* Chat textarea specific styles */
+.chat-textarea {
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 107, 53, 0.2) transparent;
 }
 
 /* Focus states for chat input */
