@@ -421,7 +421,7 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
 
                   {/* Show completion status */}
                   {nodeResult && !hasImageOutput && (
-                    <div className={`text-[10px] px-2 py-1 rounded ${
+                    <div className={`text-[10px] px-2 py-1 rounded break-all overflow-hidden ${
                       nodeResult.status === 'completed' ? 'bg-green-900/20 text-green-400' :
                       nodeResult.status === 'failed' ? 'bg-red-900/20 text-red-400' :
                       nodeResult.status === 'running' ? 'bg-yellow-900/20 text-yellow-400' :
