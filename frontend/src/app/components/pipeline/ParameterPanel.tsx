@@ -287,7 +287,7 @@ export function ParameterPanel({ node, inputConnections, executionState, onUpdat
       </div>
 
       {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-0 chat-scroll">
         {/* Parameters */}
         <div className="p-3">
           {/* Connectable inputs (IMAGE/MASK) - shown as connection status */}
