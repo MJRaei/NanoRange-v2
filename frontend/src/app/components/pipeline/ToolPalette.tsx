@@ -37,7 +37,7 @@ export function ToolPalette({ onToolSelect }: ToolPaletteProps) {
   const { tools, loading, error, refetch } = useTools();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(['io', 'preprocessing', 'segmentation'])
+    new Set()
   );
 
   const toggleCategory = useCallback((category: string) => {

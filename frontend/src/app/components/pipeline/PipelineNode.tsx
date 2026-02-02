@@ -197,7 +197,7 @@ export function PipelineNode({
         >
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-white opacity-70">
-              {node.tool.category.toUpperCase()}
+              {node.tool.category.replace(/_/g, ' ').toUpperCase()}
             </span>
           </div>
           <button
