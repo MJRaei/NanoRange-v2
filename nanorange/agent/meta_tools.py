@@ -9,14 +9,18 @@ These tools are used by the orchestrator agent to:
 - Execute with iterative refinement
 """
 
-from typing import Any, Dict, List, Optional
-from nanorange.core.schemas import Pipeline, PipelineStep, StepInput, InputSource
+import json
+from uuid import uuid4
+from datetime import datetime
+from typing import Any, Dict, Optional
+from nanorange.core.schemas import Pipeline, PipelineStep, StepInput, InputSource, StepStatus
 from nanorange.core.registry import get_registry
 from nanorange.core.pipeline import PipelineManager
 from nanorange.core.executor import PipelineExecutor
 from nanorange.storage.session_manager import SessionManager
 from nanorange.agent.refinement import AdaptiveExecutor
 from nanorange.core.refinement_schemas import RefinementReport
+from nanorange.storage.database import get_session as get_db_session, SavedPipelineModel
 
 
 _current_manager: Optional[PipelineManager] = None
@@ -892,59 +896,185 @@ def get_pipeline_summary() -> Dict[str, Any]:
 def save_pipeline(name: str, description: str = "") -> Dict[str, Any]:
     """
     Save the current pipeline as a reusable template.
-    
+
     Args:
         name: Template name (must be unique)
         description: Description of the pipeline
-        
+
     Returns:
         Save status
     """
     manager = _get_manager()
-    session = _get_session()
-    
+
     if not manager.current_pipeline:
         return {"status": "error", "message": "No active pipeline"}
-    
+
+    frontend_pipeline = get_current_pipeline_for_frontend()
+    if not frontend_pipeline:
+        return {"status": "error", "message": "Failed to convert pipeline to frontend format"}
+
+    frontend_pipeline["name"] = name
+    frontend_pipeline["description"] = description
+
+    db = None
     try:
-        template_id = session.save_as_template(
-            manager.current_pipeline,
-            name=name,
-            description=description
-        )
+        db = get_db_session()
+
+        existing = db.query(SavedPipelineModel).filter_by(name=name).first()
+
+        if existing:
+            existing.description = description
+            existing.definition_json = json.dumps(frontend_pipeline)
+            template_id = existing.id
+        else:
+            template = SavedPipelineModel(
+                name=name,
+                description=description,
+                category="agent",
+                definition_json=json.dumps(frontend_pipeline),
+            )
+            db.add(template)
+            db.flush()
+            template_id = template.id
+
+        db.commit()
+
         return {
             "status": "saved",
             "template_name": name,
             "template_id": template_id,
         }
-    except ValueError as e:
+    except Exception as e:
+        if db:
+            db.rollback()
         return {"status": "error", "message": str(e)}
+    finally:
+        if db:
+            db.close()
 
 
 def load_pipeline(name: str) -> Dict[str, Any]:
     """
     Load a saved pipeline template.
-    
+
     Args:
         name: Template name
-        
+
     Returns:
         Pipeline summary
     """
     manager = _get_manager()
-    session = _get_session()
-    
-    pipeline = session.load_template(name)
-    if not pipeline:
-        return {"status": "error", "message": f"Template not found: {name}"}
-    
-    manager.load_pipeline(pipeline)
-    return {
-        "status": "loaded",
-        "pipeline_id": pipeline.pipeline_id,
-        "name": pipeline.name,
-        "steps_count": len(pipeline.steps),
-    }
+    registry = get_registry()
+
+    db = None
+    try:
+        db = get_db_session()
+        template = db.query(SavedPipelineModel).filter_by(name=name).first()
+
+        if not template:
+            return {"status": "error", "message": f"Template not found: {name}"}
+
+        template.use_count += 1
+        template.last_used_at = datetime.utcnow()
+        db.commit()
+
+        definition = template.definition
+
+        if "nodes" in definition:
+            nodes = definition.get("nodes", [])
+            edges = definition.get("edges", [])
+
+            edge_map = {}
+            for edge in edges:
+                target_node_id = edge["targetNodeId"]
+                target_input = edge["targetInput"]
+                if target_node_id not in edge_map:
+                    edge_map[target_node_id] = {}
+                edge_map[target_node_id][target_input] = edge
+
+            steps = []
+            for node in nodes:
+                node_id = node["id"]
+                tool_id = node["toolId"]
+                tool_schema = registry.get_schema(tool_id)
+
+                if not tool_schema:
+                    continue
+
+                step_inputs = {}
+                node_inputs = node.get("inputs", {})
+
+                for input_schema in tool_schema.inputs:
+                    input_name = input_schema.name
+
+                    if node_id in edge_map and input_name in edge_map[node_id]:
+                        edge = edge_map[node_id][input_name]
+                        step_inputs[input_name] = StepInput(
+                            source=InputSource.STEP_OUTPUT,
+                            source_step_id=edge["sourceNodeId"],
+                            source_output=edge["sourceOutput"]
+                        )
+                    elif input_name in node_inputs:
+                        node_input = node_inputs[input_name]
+                        input_type = node_input.get("type", "static")
+
+                        if input_type == "connection" and "sourceNodeId" in node_input:
+                            step_inputs[input_name] = StepInput(
+                                source=InputSource.STEP_OUTPUT,
+                                source_step_id=node_input["sourceNodeId"],
+                                source_output=node_input.get("sourceOutput", "")
+                            )
+                        elif input_type == "user_input":
+                            step_inputs[input_name] = StepInput(
+                                source=InputSource.USER_INPUT,
+                                prompt=node_input.get("prompt", f"Enter {input_name}")
+                            )
+                        else:
+                            step_inputs[input_name] = StepInput(
+                                source=InputSource.STATIC,
+                                value=node_input.get("value")
+                            )
+                    elif input_schema.default is not None:
+                        step_inputs[input_name] = StepInput(
+                            source=InputSource.STATIC,
+                            value=input_schema.default
+                        )
+
+                step = PipelineStep(
+                    step_id=node_id,
+                    step_name=tool_schema.name,
+                    tool_id=tool_id,
+                    inputs=step_inputs,
+                    status=StepStatus.PENDING
+                )
+                steps.append(step)
+
+            pipeline = Pipeline(
+                pipeline_id=str(uuid4()),
+                name=definition.get("name", name),
+                description=definition.get("description", ""),
+                steps=steps,
+                created_at=datetime.utcnow(),
+                modified_at=datetime.utcnow()
+            )
+        else:
+            pipeline = Pipeline.model_validate(definition)
+            pipeline.pipeline_id = str(uuid4())
+            pipeline.created_at = datetime.utcnow()
+            pipeline.modified_at = datetime.utcnow()
+
+        manager.load_pipeline(pipeline)
+        return {
+            "status": "loaded",
+            "pipeline_id": pipeline.pipeline_id,
+            "name": pipeline.name,
+            "steps_count": len(pipeline.steps),
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        if db:
+            db.close()
 
 
 def list_saved_pipelines(category: Optional[str] = None) -> Dict[str, Any]:
