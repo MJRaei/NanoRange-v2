@@ -81,7 +81,7 @@ You MUST use these EXACT tool IDs and parameter names. Do NOT invent or guess na
   - `cellprob_threshold` (optional, default=0.0): Cell probability threshold (-6.0 to 6.0). Lower values detect more objects. Use negative values (-1 to -3) for faint objects
   - `use_gpu` (optional, default=True): Whether to use GPU acceleration
   - `min_size` (optional, default=15): Minimum object size in pixels (smaller objects removed)
-  - `output_dir` (optional): Output directory path (defaults to subfolder of input image)
+  - `output_path` (optional): Output path (parent directory will be used for all outputs)
   - `overlay_alpha` (optional, default=0.5): Overlay transparency (0-1)
   - **Outputs**: `object_count`, `overlay_image` (for review), `mask_image`, `raw_mask`, `measurements_csv`, `summary`, `parameters_used`
   - **Note**: This tool produces overlay visualizations that can be reviewed. The executor can use adaptive execution to automatically refine parameters based on the overlay quality.

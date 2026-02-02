@@ -58,7 +58,7 @@ You can ONLY use these EXACT tool IDs and parameter names. Do NOT invent or gues
 - `colorize_boundaries`: image_path (required), max_colors (NOT n_colors!), boundary_color, high_contrast
 
 **ML Segmentation:**
-- `cellpose_segment`: image_path (required), model_type (optional, default="nuclei"), diameter (optional, default=30.0), flow_threshold (optional, default=0.4), cellprob_threshold (optional, default=0.0), use_gpu (optional, default=True), min_size (optional, default=15), output_dir (optional), overlay_alpha (optional, default=0.5)
+- `cellpose_segment`: image_path (required), model_type (optional, default="nuclei"), diameter (optional, default=30.0), flow_threshold (optional, default=0.4), cellprob_threshold (optional, default=0.0), use_gpu (optional, default=True), min_size (optional, default=15), output_path (optional), overlay_alpha (optional, default=0.5)
   - Outputs: object_count, overlay_image, mask_image, raw_mask, measurements_csv, summary, parameters_used
   - Model types: "nuclei" (round nuclei), "cyto"/"cyto2"/"cyto3" (cell bodies), "cpsam" (general), "tissuenet_cp3" (tissue), "livecell_cp3" (live cells)
 
