@@ -7,9 +7,10 @@
  * Other inputs are editable via form fields.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import type { PipelineNode, NodeInputValue, DataType, PipelineEdge, PipelineExecutionState } from './types';
 import { isConnectableType, getInputSatisfactionStatus } from './utils/connectionUtils';
+import { uploadImage } from '../api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -45,6 +46,150 @@ interface ParameterPanelProps {
   executionState: PipelineExecutionState;
   onUpdateInput: (nodeId: string, inputName: string, value: NodeInputValue) => void;
   onDeleteNode: (nodeId: string) => void;
+}
+
+function PathInputField({
+  name,
+  value,
+  description,
+  onChange,
+}: {
+  name: string;
+  value: string;
+  description: string;
+  onChange: (value: unknown) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Determine if this is an output path (folder selection) or input path (file selection)
+  const isOutputPath = name.toLowerCase().includes('output');
+
+  const handleFileSelect = async (file: File) => {
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const result = await uploadImage(file);
+      if (result.success) {
+        onChange(result.file_path);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFolderSelect = async () => {
+    // Use the File System Access API if available (Chrome, Edge)
+    if ('showDirectoryPicker' in window) {
+      try {
+        const dirHandle = await (window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
+        // We can only get the folder name, not the full path due to browser security
+        // But this at least gives users a folder picker experience
+        onChange(dirHandle.name);
+      } catch (err) {
+        // User cancelled or error
+        if ((err as Error).name !== 'AbortError') {
+          console.error('Error selecting folder:', err);
+        }
+      }
+    } else {
+      // Fallback: use the folder input with webkitdirectory
+      folderInputRef.current?.click();
+    }
+  };
+
+  const handleFolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Extract folder path from the first file's webkitRelativePath
+      const relativePath = (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath;
+      if (relativePath) {
+        const folderName = relativePath.split('/')[0];
+        onChange(folderName);
+      }
+    }
+    if (folderInputRef.current) {
+      folderInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="flex gap-1.5">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={description}
+        className="flex-1 px-3 py-1.5 rounded text-sm bg-black/30 border text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50"
+        style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
+      />
+      {isOutputPath ? (
+        <>
+          <input
+            ref={folderInputRef}
+            type="file"
+            onChange={handleFolderChange}
+            className="hidden"
+            {...{ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>}
+          />
+          <button
+            type="button"
+            onClick={handleFolderSelect}
+            className="px-2 py-1.5 rounded bg-black/30 border text-gray-400 hover:text-orange-400 hover:border-orange-500/50 transition-colors"
+            style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
+            title="Browse for folder"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          </button>
+        </>
+      ) : (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/jpg,image/tiff"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="px-2 py-1.5 rounded bg-black/30 border text-gray-400 hover:text-orange-400 hover:border-orange-500/50 transition-colors disabled:opacity-50"
+            style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
+            title="Browse for file"
+          >
+            {isUploading ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            )}
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
 
 function InputField({
@@ -123,7 +268,6 @@ function InputField({
       );
 
     case 'STRING':
-    case 'PATH':
       return (
         <input
           type="text"
@@ -132,6 +276,16 @@ function InputField({
           placeholder={description}
           className="w-full px-3 py-1.5 rounded text-sm bg-black/30 border text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50"
           style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
+        />
+      );
+
+    case 'PATH':
+      return (
+        <PathInputField
+          name={name}
+          value={value as string}
+          description={description}
+          onChange={handleChange}
         />
       );
 
