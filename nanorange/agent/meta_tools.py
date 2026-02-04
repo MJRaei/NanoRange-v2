@@ -1157,9 +1157,9 @@ def get_current_pipeline_for_frontend() -> Optional[Dict[str, Any]]:
     nodes = []
     step_id_to_node_id = {}
 
-    x_position = 250
-    y_position = 50
-    y_spacing = 180
+    position = 20
+    spacing = 260
+    nodes_per_row = 3
 
     for idx, step in enumerate(pipeline.steps):
         node_id = f"node_{step.step_id}"
@@ -1230,11 +1230,13 @@ def get_current_pipeline_for_frontend() -> Optional[Dict[str, Any]]:
                     "value": step_input.value,
                 }
 
+        row = idx // nodes_per_row
+        col = idx % nodes_per_row
         node = {
             "id": node_id,
             "toolId": step.tool_id,
             "tool": tool_def,
-            "position": {"x": x_position, "y": y_position + idx * y_spacing},
+            "position": {"x": position + col * spacing, "y": position + row * spacing},
             "inputs": inputs,
         }
         nodes.append(node)
