@@ -319,7 +319,12 @@ export function PipelineCanvas({
   // Keyboard event handlers for space key (pan mode)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat) {
+      const activeElement = document.activeElement;
+      const isTyping = activeElement instanceof HTMLInputElement ||
+                       activeElement instanceof HTMLTextAreaElement ||
+                       activeElement?.getAttribute('contenteditable') === 'true';
+
+      if (e.code === 'Space' && !e.repeat && !isTyping) {
         e.preventDefault();
         setSpacePressed(true);
       }
