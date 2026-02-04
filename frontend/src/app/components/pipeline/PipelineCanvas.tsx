@@ -12,6 +12,7 @@ import React, {
   useCallback,
   useEffect,
   MouseEvent as ReactMouseEvent,
+  WheelEvent as ReactWheelEvent,
 } from 'react';
 import { PipelineNode } from './PipelineNode';
 import type {
@@ -20,8 +21,14 @@ import type {
   ToolDefinition,
   Position,
   PipelineExecutionState,
+  CanvasState,
 } from './types';
 import { getPortConfig } from './utils/connectionUtils';
+
+// Zoom constraints
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 2;
+const ZOOM_SENSITIVITY = 0.001;
 
 interface PipelineCanvasProps {
   pipeline: Pipeline;
@@ -77,6 +84,7 @@ export function PipelineCanvas({
   getNodeOutputConnections,
 }: PipelineCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [dragState, setDragState] = useState<DragState>({ type: null });
   const [pendingConnection, setPendingConnection] = useState<{
     sourceNodeId: string;
@@ -84,6 +92,21 @@ export function PipelineCanvas({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [snapTargetNodeId, setSnapTargetNodeId] = useState<string | null>(null);
   const [nodeExpansion, setNodeExpansion] = useState<Record<string, NodeExpansionState>>({});
+
+  // Canvas zoom and pan state
+  const [canvasState, setCanvasState] = useState<CanvasState>({ zoom: 1, pan: { x: 0, y: 0 } });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<Position | null>(null);
+  const [spacePressed, setSpacePressed] = useState(false);
+
+  // Convert screen coordinates to canvas coordinates (accounting for zoom and pan)
+  const screenToCanvas = useCallback((screenX: number, screenY: number): Position => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: screenX, y: screenY };
+    const x = (screenX - rect.left - canvasState.pan.x) / canvasState.zoom;
+    const y = (screenY - rect.top - canvasState.pan.y) / canvasState.zoom;
+    return { x, y };
+  }, [canvasState]);
 
   // Get expansion state for a node (defaults to collapsed)
   const getNodeExpansion = useCallback((nodeId: string): NodeExpansionState => {
@@ -181,21 +204,20 @@ export function PipelineCanvas({
       const node = pipeline.nodes.find((n) => n.id === nodeId);
       if (!node) return;
 
+      // Convert mouse position to canvas coordinates and calculate offset
+      const canvasPos = screenToCanvas(e.clientX, e.clientY);
       setDragState({
         type: 'node',
         nodeId,
-        startPos: { x: e.clientX - node.position.x, y: e.clientY - node.position.y },
+        startPos: { x: canvasPos.x - node.position.x, y: canvasPos.y - node.position.y },
       });
     },
-    [pipeline.nodes]
+    [pipeline.nodes, screenToCanvas]
   );
 
   // Handle connection dragging from output port
   const handleConnectionStart = useCallback(
     (nodeId: string, e: ReactMouseEvent) => {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
       const node = pipeline.nodes.find((n) => n.id === nodeId);
       if (!node) return;
 
@@ -203,15 +225,17 @@ export function PipelineCanvas({
       const portConfig = getPortConfig(node.tool);
       if (!portConfig.hasOutputPort) return;
 
+      // Convert to canvas coordinates
+      const canvasPos = screenToCanvas(e.clientX, e.clientY);
       setPendingConnection({ sourceNodeId: nodeId });
       setDragState({
         type: 'connection',
         nodeId,
-        startPos: { x: e.clientX - rect.left, y: e.clientY - rect.top },
-        currentPos: { x: e.clientX - rect.left, y: e.clientY - rect.top },
+        startPos: canvasPos,
+        currentPos: canvasPos,
       });
     },
-    [pipeline.nodes]
+    [pipeline.nodes, screenToCanvas]
   );
 
   // Track which node's input port is being hovered
@@ -224,10 +248,12 @@ export function PipelineCanvas({
   const hoveredNodeIdRef = useRef(hoveredNodeId);
   const dragStateRef = useRef(dragState);
   const findSnapTargetRef = useRef(findSnapTarget);
+  const screenToCanvasRef = useRef(screenToCanvas);
   pendingConnectionRef.current = pendingConnection;
   hoveredNodeIdRef.current = hoveredNodeId;
   dragStateRef.current = dragState;
   findSnapTargetRef.current = findSnapTarget;
+  screenToCanvasRef.current = screenToCanvas;
 
   // Global mouse move handler
   useEffect(() => {
@@ -235,24 +261,24 @@ export function PipelineCanvas({
       if (!dragState.type) return;
 
       if (dragState.type === 'node' && dragState.nodeId && dragState.startPos) {
+        // Convert mouse position to canvas coordinates
+        const canvasPos = screenToCanvasRef.current(e.clientX, e.clientY);
         onUpdateNodePosition(dragState.nodeId, {
-          x: e.clientX - dragState.startPos.x,
-          y: e.clientY - dragState.startPos.y,
+          x: canvasPos.x - dragState.startPos.x,
+          y: canvasPos.y - dragState.startPos.y,
         });
       }
 
       if (dragState.type === 'connection' && dragState.nodeId) {
-        const rect = canvasRef.current?.getBoundingClientRect();
-        if (rect) {
-          const currentPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-          setDragState((prev) => ({
-            ...prev,
-            currentPos,
-          }));
-          // Update snap target for visual feedback
-          const snapTarget = findSnapTargetRef.current(currentPos, dragState.nodeId);
-          setSnapTargetNodeId(snapTarget);
-        }
+        // Convert to canvas coordinates
+        const currentPos = screenToCanvasRef.current(e.clientX, e.clientY);
+        setDragState((prev) => ({
+          ...prev,
+          currentPos,
+        }));
+        // Update snap target for visual feedback
+        const snapTarget = findSnapTargetRef.current(currentPos, dragState.nodeId);
+        setSnapTargetNodeId(snapTarget);
       }
     };
 
@@ -290,14 +316,109 @@ export function PipelineCanvas({
     };
   }, [dragState, onUpdateNodePosition, onAddEdge]);
 
-  // Handle canvas click to deselect
+  // Keyboard event handlers for space key (pan mode)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        setSpacePressed(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setSpacePressed(false);
+        setIsPanning(false);
+        setPanStart(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Handle mouse wheel for zooming
+  const handleWheel = useCallback((e: ReactWheelEvent) => {
+    e.preventDefault();
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // Mouse position relative to canvas
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Calculate new zoom level
+    const delta = -e.deltaY * ZOOM_SENSITIVITY;
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, canvasState.zoom * (1 + delta)));
+    const zoomRatio = newZoom / canvasState.zoom;
+
+    // Adjust pan to zoom towards mouse position
+    const newPanX = mouseX - (mouseX - canvasState.pan.x) * zoomRatio;
+    const newPanY = mouseY - (mouseY - canvasState.pan.y) * zoomRatio;
+
+    setCanvasState({
+      zoom: newZoom,
+      pan: { x: newPanX, y: newPanY }
+    });
+  }, [canvasState]);
+
+  // Handle mouse down for panning (middle button, space+left click, or left click on background)
+  const handleCanvasMouseDown = useCallback((e: ReactMouseEvent) => {
+    // Middle mouse button or space+left click starts panning anywhere
+    if (e.button === 1 || (spacePressed && e.button === 0)) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - canvasState.pan.x, y: e.clientY - canvasState.pan.y });
+    }
+    // Left click on canvas background or content area (not on a node) also starts panning
+    else if (e.button === 0 && (e.target === canvasRef.current || e.target === contentRef.current)) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - canvasState.pan.x, y: e.clientY - canvasState.pan.y });
+    }
+  }, [spacePressed, canvasState.pan]);
+
+  // Global pan move handler
+  useEffect(() => {
+    if (!isPanning || !panStart) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setCanvasState(prev => ({
+        ...prev,
+        pan: { x: e.clientX - panStart.x, y: e.clientY - panStart.y }
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setIsPanning(false);
+      setPanStart(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isPanning, panStart]);
+
+  // Reset zoom and pan
+  const resetView = useCallback(() => {
+    setCanvasState({ zoom: 1, pan: { x: 0, y: 0 } });
+  }, []);
+
+  // Handle canvas click to deselect (but not when panning)
   const handleCanvasClick = useCallback(
     (e: ReactMouseEvent) => {
-      if (e.target === canvasRef.current) {
+      // Don't deselect if we just finished panning or if space is pressed
+      if (spacePressed || isPanning) return;
+      if (e.target === canvasRef.current || e.target === contentRef.current) {
         onSelectNode(null);
       }
     },
-    [onSelectNode]
+    [onSelectNode, spacePressed, isPanning]
   );
 
   // Handle drop from tool palette
@@ -307,16 +428,15 @@ export function PipelineCanvas({
       const toolData = e.dataTransfer.getData('tool');
       if (toolData) {
         const tool: ToolDefinition = JSON.parse(toolData);
-        const rect = canvasRef.current?.getBoundingClientRect();
-        if (rect) {
-          onDropTool(tool, {
-            x: e.clientX - rect.left - 90,
-            y: e.clientY - rect.top - 20,
-          });
-        }
+        // Convert drop position to canvas coordinates
+        const canvasPos = screenToCanvas(e.clientX, e.clientY);
+        onDropTool(tool, {
+          x: canvasPos.x - 90,
+          y: canvasPos.y - 20,
+        });
       }
     },
-    [onDropTool]
+    [onDropTool, screenToCanvas]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -364,6 +484,9 @@ export function PipelineCanvas({
     return `M ${startX} ${startY} C ${startX + controlPointOffset} ${startY}, ${endX - controlPointOffset} ${endY}, ${endX} ${endY}`;
   };
 
+  // Grid size adjusted for zoom
+  const gridSize = 20 * canvasState.zoom;
+
   return (
     <div
       ref={canvasRef}
@@ -374,72 +497,126 @@ export function PipelineCanvas({
           linear-gradient(rgba(255, 107, 53, 0.03) 1px, transparent 1px),
           linear-gradient(90deg, rgba(255, 107, 53, 0.03) 1px, transparent 1px)
         `,
-        backgroundSize: '20px 20px',
+        backgroundSize: `${gridSize}px ${gridSize}px`,
+        backgroundPosition: `${canvasState.pan.x}px ${canvasState.pan.y}px`,
+        cursor: isPanning ? 'grabbing' : 'grab',
       }}
       onClick={handleCanvasClick}
+      onMouseDown={handleCanvasMouseDown}
+      onWheel={handleWheel}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* SVG layer for edges */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none">
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="9"
-            refY="3.5"
-            orient="auto"
-          >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#ff6b35" />
-          </marker>
-        </defs>
+      {/* Transformable content layer */}
+      <div
+        ref={contentRef}
+        className="absolute"
+        style={{
+          transform: `translate(${canvasState.pan.x}px, ${canvasState.pan.y}px) scale(${canvasState.zoom})`,
+          transformOrigin: '0 0',
+          width: '10000px',
+          height: '10000px',
+        }}
+      >
+        {/* SVG layer for edges */}
+        <svg
+          className="absolute pointer-events-none"
+          style={{ width: '10000px', height: '10000px' }}
+        >
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="9"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3.5, 0 7" fill="#ff6b35" />
+            </marker>
+          </defs>
 
-        {/* Existing edges */}
-        {pipeline.edges.map((edge) => (
-          <path
-            key={edge.id}
-            d={getEdgePath(edge)}
-            fill="none"
-            stroke="#ff6b35"
-            strokeWidth={2}
-            strokeOpacity={0.6}
-            markerEnd="url(#arrowhead)"
+          {/* Existing edges */}
+          {pipeline.edges.map((edge) => (
+            <path
+              key={edge.id}
+              d={getEdgePath(edge)}
+              fill="none"
+              stroke="#ff6b35"
+              strokeWidth={2}
+              strokeOpacity={0.6}
+              markerEnd="url(#arrowhead)"
+            />
+          ))}
+
+          {/* Pending connection */}
+          {dragState.type === 'connection' && (
+            <path
+              d={getPendingConnectionPath()}
+              fill="none"
+              stroke="#ff6b35"
+              strokeWidth={2}
+              strokeDasharray="5,5"
+              strokeOpacity={0.8}
+            />
+          )}
+        </svg>
+
+        {/* Nodes layer */}
+        {pipeline.nodes.map((node) => (
+          <PipelineNode
+            key={node.id}
+            node={node}
+            isSelected={selectedNodeId === node.id}
+            isRunning={executionState.currentNodeId === node.id}
+            inputConnections={getNodeInputConnections(node.id)}
+            outputConnections={getNodeOutputConnections(node.id)}
+            isInputPortHovered={(hoveredNodeId === node.id || snapTargetNodeId === node.id) && pendingConnection !== null}
+            expansion={getNodeExpansion(node.id)}
+            onToggleExpansion={(section) => toggleNodeExpansion(node.id, section)}
+            onSelect={onSelectNode}
+            onDelete={onDeleteNode}
+            onDragStart={handleNodeDragStart}
+            onConnectionStart={handleConnectionStart}
+            onInputPortHover={handleInputPortHover}
           />
         ))}
+      </div>
 
-        {/* Pending connection */}
-        {dragState.type === 'connection' && (
-          <path
-            d={getPendingConnectionPath()}
-            fill="none"
-            stroke="#ff6b35"
-            strokeWidth={2}
-            strokeDasharray="5,5"
-            strokeOpacity={0.8}
-          />
-        )}
-      </svg>
-
-      {/* Nodes layer */}
-      {pipeline.nodes.map((node) => (
-        <PipelineNode
-          key={node.id}
-          node={node}
-          isSelected={selectedNodeId === node.id}
-          isRunning={executionState.currentNodeId === node.id}
-          inputConnections={getNodeInputConnections(node.id)}
-          outputConnections={getNodeOutputConnections(node.id)}
-          isInputPortHovered={(hoveredNodeId === node.id || snapTargetNodeId === node.id) && pendingConnection !== null}
-          expansion={getNodeExpansion(node.id)}
-          onToggleExpansion={(section) => toggleNodeExpansion(node.id, section)}
-          onSelect={onSelectNode}
-          onDelete={onDeleteNode}
-          onDragStart={handleNodeDragStart}
-          onConnectionStart={handleConnectionStart}
-          onInputPortHover={handleInputPortHover}
-        />
-      ))}
+      {/* Zoom controls (fixed position, outside transform) */}
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-neutral-800/90 rounded-lg px-3 py-2 shadow-lg">
+        <button
+          onClick={() => setCanvasState(prev => ({ ...prev, zoom: Math.max(MIN_ZOOM, prev.zoom - 0.1) }))}
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-gray-300 hover:text-white transition-colors"
+          title="Zoom out"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+          </svg>
+        </button>
+        <span className="text-gray-300 text-sm min-w-[48px] text-center">
+          {Math.round(canvasState.zoom * 100)}%
+        </span>
+        <button
+          onClick={() => setCanvasState(prev => ({ ...prev, zoom: Math.min(MAX_ZOOM, prev.zoom + 0.1) }))}
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-gray-300 hover:text-white transition-colors"
+          title="Zoom in"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+        <div className="w-px h-4 bg-neutral-600 mx-1" />
+        <button
+          onClick={resetView}
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-gray-300 hover:text-white transition-colors"
+          title="Reset view"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+        </button>
+      </div>
 
       {/* Empty state */}
       {pipeline.nodes.length === 0 && (
