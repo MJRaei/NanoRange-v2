@@ -113,7 +113,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
       <div className="flex-1 flex overflow-hidden">
         {/* Left panel - Tool Palette / Saved Pipelines */}
         <div
-          className="flex-shrink-0 border-r transition-all duration-200"
+          className="shrink-0 border-r transition-all duration-200"
           style={{
             width: isLeftCollapsed ? 40 : leftPanelWidth,
             borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -142,7 +142,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
             <div className="h-full flex flex-col">
               {/* Tab header with collapse button */}
               <div
-                className="flex-shrink-0 flex items-center border-b"
+                className="shrink-0 flex items-center border-b"
                 style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
               >
                 {/* Tabs */}
@@ -219,7 +219,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
 
         {/* Right panel - Parameter Panel */}
         <div
-          className="flex-shrink-0 border-l transition-all duration-200"
+          className="shrink-0 border-l transition-all duration-200"
           style={{
             width: isRightCollapsed ? 40 : rightPanelWidth,
             borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -248,7 +248,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
             <div className="h-full flex flex-col">
               <button
                 onClick={toggleRightPanel}
-                className="flex-shrink-0 w-full p-2 flex items-center hover:bg-white/5 transition-colors border-b"
+                className="shrink-0 w-full p-2 flex items-center hover:bg-white/5 transition-colors border-b"
                 style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}
               >
                 <svg
