@@ -41,6 +41,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
     selectNode,
     updateNodeInput,
     addEdge,
+    removeEdge,
     clearPipeline,
     setPipelineName,
     runPipeline,
@@ -209,6 +210,7 @@ export function PipelineEditor({ className = '' }: PipelineEditorProps) {
             onDeleteNode={removeNode}
             onUpdateNodePosition={updateNodePosition}
             onAddEdge={addEdge}
+            onRemoveEdge={removeEdge}
             onDropTool={handleDropTool}
             getNodeInputConnections={getNodeInputConnections}
             getNodeOutputConnections={getNodeOutputConnections}

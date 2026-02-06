@@ -38,6 +38,7 @@ interface PipelineCanvasProps {
   onDeleteNode: (nodeId: string) => void;
   onUpdateNodePosition: (nodeId: string, position: Position) => void;
   onAddEdge: (sourceNodeId: string, targetNodeId: string) => string | null;
+  onRemoveEdge: (edgeId: string) => void;
   onDropTool: (tool: ToolDefinition, position: Position) => void;
   getNodeInputConnections: (nodeId: string) => PipelineEdge[];
   getNodeOutputConnections: (nodeId: string) => PipelineEdge[];
@@ -79,6 +80,7 @@ export function PipelineCanvas({
   onDeleteNode,
   onUpdateNodePosition,
   onAddEdge,
+  onRemoveEdge,
   onDropTool,
   getNodeInputConnections,
   getNodeOutputConnections,
@@ -92,6 +94,7 @@ export function PipelineCanvas({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [snapTargetNodeId, setSnapTargetNodeId] = useState<string | null>(null);
   const [nodeExpansion, setNodeExpansion] = useState<Record<string, NodeExpansionState>>({});
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
 
   // Canvas zoom and pan state
   const [canvasState, setCanvasState] = useState<CanvasState>({ zoom: 1, pan: { x: 0, y: 0 } });
@@ -542,17 +545,37 @@ export function PipelineCanvas({
           </defs>
 
           {/* Existing edges */}
-          {pipeline.edges.map((edge) => (
-            <path
-              key={edge.id}
-              d={getEdgePath(edge)}
-              fill="none"
-              stroke="#ff6b35"
-              strokeWidth={2}
-              strokeOpacity={0.6}
-              markerEnd="url(#arrowhead)"
-            />
-          ))}
+          {pipeline.edges.map((edge) => {
+            const isHovered = hoveredEdgeId === edge.id;
+            return (
+              <g key={edge.id} style={{ cursor: 'pointer' }}>
+                {/* Invisible wider hit area for easier clicking */}
+                <path
+                  d={getEdgePath(edge)}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={16}
+                  style={{ pointerEvents: 'stroke' }}
+                  onMouseEnter={() => setHoveredEdgeId(edge.id)}
+                  onMouseLeave={() => setHoveredEdgeId(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveEdge(edge.id);
+                  }}
+                />
+                {/* Visible edge */}
+                <path
+                  d={getEdgePath(edge)}
+                  fill="none"
+                  stroke={isHovered ? '#ff4444' : '#ff6b35'}
+                  strokeWidth={2}
+                  strokeOpacity={isHovered ? 1 : 0.6}
+                  markerEnd="url(#arrowhead)"
+                  style={{ pointerEvents: 'none', transition: 'stroke 0.15s, stroke-opacity 0.15s' }}
+                />
+              </g>
+            );
+          })}
 
           {/* Pending connection */}
           {dragState.type === 'connection' && (
