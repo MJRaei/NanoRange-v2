@@ -101,7 +101,7 @@ def colorize_boundaries(
     output_path: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Colorize object boundaries using AI-powered processing.
+    Colorize object boundaries using Gemini 3.0-powered processing.
     
     Uses Gemini's image generation to assign distinct colors to each
     object's boundary, making it easier to differentiate overlapping
@@ -172,7 +172,7 @@ COLORIZE_BOUNDARIES_SCHEMA = ToolSchema(
     tool_id="colorize_boundaries",
     name="Boundary Colorizer",
     description=(
-        "Colorize object boundaries using AI. Assigns distinct colors to each "
+        "Colorize object boundaries using Gemini 3.0. Assigns distinct colors to each "
         "object's boundary, making it easier to differentiate overlapping or "
         "touching particles/objects. Useful for segmentation visualization."
     ),

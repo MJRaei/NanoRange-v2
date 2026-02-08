@@ -156,7 +156,7 @@ class AgentToolBase(ToolBase):
         class ImageGeneratorTool(AgentToolBase):
             tool_id = "ai_image_generator"
             name = "AI Image Generator"
-            description = "Generates images using AI based on text prompts"
+            description = "Generates images using Gemini 3.0 based on text prompts"
             
             inputs = [
                 InputSchema(name="prompt", type=DataType.INSTRUCTIONS, required=True),

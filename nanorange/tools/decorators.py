@@ -264,7 +264,7 @@ def agent_tool(
             category="enhancement",
         )
         async def ai_enhance(image_path: str, instructions: str) -> Dict[str, Any]:
-            '''Enhance image using AI.
+            '''Enhance image using Gemini 3.0.
             
             Args:
                 image_path: Path to input image.

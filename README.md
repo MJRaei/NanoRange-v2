@@ -63,11 +63,13 @@ pip install -e .
 1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
 
 2. Create a `.env` file:
+
 ```bash
 echo 'GOOGLE_API_KEY="your-api-key-here"' > .env
 ```
 
 3. Initialize NanoRange:
+
 ```bash
 nanorange init
 ```
@@ -83,10 +85,11 @@ nanorange chat
 ```
 
 Example conversation:
+
 ```
 You: I want to count cells in my fluorescence image
 
-NanoRange: I'll help you build a cell counting pipeline. First, let me see 
+NanoRange: I'll help you build a cell counting pipeline. First, let me see
 what tools are available...
 
 I'll create a pipeline with these steps:
@@ -117,6 +120,7 @@ nanorange web --port 8000
 ```
 
 Or directly with ADK:
+
 ```bash
 adk web --port 8000
 ```
@@ -138,7 +142,7 @@ from nanorange.core.schemas import DataType
 )
 def my_custom_filter(image_path: str, strength: float = 0.5) -> str:
     """Apply my custom filter to an image.
-    
+
     Args:
         image_path: Path to input image
         strength: Filter strength (0-1)
@@ -159,7 +163,7 @@ class MyAdvancedTool(ToolBase):
     name = "My Advanced Tool"
     description = "An advanced analysis tool"
     category = "analysis"
-    
+
     inputs = [
         InputSchema(name="image_path", type=DataType.IMAGE, required=True),
         InputSchema(name="threshold", type=DataType.FLOAT, default=0.5),
@@ -168,7 +172,7 @@ class MyAdvancedTool(ToolBase):
         OutputSchema(name="result_image", type=DataType.IMAGE),
         OutputSchema(name="measurements", type=DataType.MEASUREMENTS),
     ]
-    
+
     def execute(self, image_path: str, threshold: float = 0.5):
         # Your implementation
         return {
@@ -185,9 +189,9 @@ from nanorange.tools import AgentToolBase
 class AIEnhancerTool(AgentToolBase):
     tool_id = "ai_enhancer"
     name = "AI Image Enhancer"
-    description = "Enhance images using AI"
+    description = "Enhance images using Gemini 3.0"
     category = "ai"
-    
+
     def setup_agent(self):
         from google.adk.agents.llm_agent import Agent
         self.agent = Agent(
@@ -195,7 +199,7 @@ class AIEnhancerTool(AgentToolBase):
             name='enhancer',
             instruction="Enhance microscopy images",
         )
-    
+
     async def execute_agent(self, image_path: str, instructions: str):
         # Use sub-agent for enhancement
         result = await self.agent.run(f"Enhance {image_path}: {instructions}")
@@ -235,18 +239,18 @@ nanorange/
 
 NanoRange supports these data types for tool inputs/outputs:
 
-| Type | Description |
-|------|-------------|
-| `IMAGE` | Path to an image file |
-| `MASK` | Binary mask image path |
-| `FLOAT` | Floating point number |
-| `INT` | Integer |
-| `STRING` | Text string |
-| `BOOL` | Boolean |
-| `LIST` | List of values |
-| `DICT` | Dictionary |
-| `MEASUREMENTS` | Measurement results |
-| `PARAMETERS` | Parameter dictionary |
+| Type           | Description                         |
+| -------------- | ----------------------------------- |
+| `IMAGE`        | Path to an image file               |
+| `MASK`         | Binary mask image path              |
+| `FLOAT`        | Floating point number               |
+| `INT`          | Integer                             |
+| `STRING`       | Text string                         |
+| `BOOL`         | Boolean                             |
+| `LIST`         | List of values                      |
+| `DICT`         | Dictionary                          |
+| `MEASUREMENTS` | Measurement results                 |
+| `PARAMETERS`   | Parameter dictionary                |
 | `INSTRUCTIONS` | Text instructions (for agent tools) |
 
 ## License

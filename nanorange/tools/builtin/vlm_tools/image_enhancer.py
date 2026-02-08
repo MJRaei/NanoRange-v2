@@ -124,7 +124,7 @@ def ai_enhance_image(
     output_path: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Enhance an image using AI-powered processing.
+    Enhance an image using Gemini 3.0-powered processing.
     
     Uses Gemini's image generation to clean up microscopy images by:
     - Adjusting background and foreground contrast
@@ -201,7 +201,7 @@ AI_ENHANCE_IMAGE_SCHEMA = ToolSchema(
     tool_id="ai_enhance_image",
     name="AI Image Enhancer",
     description=(
-        "Enhance microscopy images using AI. Cleans up images by adjusting contrast, "
+        "Enhance microscopy images using Gemini 3.0. Cleans up images by adjusting contrast, "
         "removing noise, sharpening boundaries, and separating objects from background. "
         "Highly configurable for different image types and analysis needs."
     ),
