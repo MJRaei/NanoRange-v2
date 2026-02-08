@@ -1,16 +1,59 @@
-# NanoRange
+<h1 align="center">NanoRange</h1>
 
-**Agentic Microscopy Image Analysis System**
+<p align="center">
+  <strong>Agentic Microscopy Image Analysis System</strong>
+</p>
 
-NanoRange is a modular Gemini-powered system for microscopy image analysis. An intelligent orchestrator agent dynamically builds, executes, and refines image analysis pipelines by connecting specialized tools.
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
+  <img src="https://img.shields.io/badge/status-alpha-orange?style=flat-square" alt="Alpha">
+  <img src="https://img.shields.io/badge/powered%20by-Gemini-4285F4?style=flat-square&logo=google&logoColor=white" alt="Powered by Gemini">
+</p>
 
-## Features
+<p align="center">
+  NanoRange is a modular, Gemini-powered platform for automated microscopy image analysis.<br>
+  An intelligent orchestrator agent dynamically builds, executes, and refines image processing pipelines by connecting specialized tools — so you describe <em>what</em> you want to analyze, and NanoRange figures out <em>how</em>.
+</p>
 
-- **Dynamic Pipeline Building**: The Gemini agent plans and connects tools based on your analysis goals
-- **Modular Tool System**: Easily extensible with function tools or agent-as-tools
-- **Full Traceability**: Review all steps, inputs, and outputs of your analysis
-- **Pipeline Persistence**: Save successful pipelines for reuse
-- **Type-Safe Connections**: Automatic validation of tool input/output compatibility
+---
+
+<p align="center">
+  <img src="docs/media/nanorange.gif" alt="NanoRange Demo" width="720">
+</p>
+
+---
+
+## Workflow
+
+<p align="center">
+  <img src="docs/media/workflow.png" alt="NanoRange Workflow" width="800">
+</p>
+
+---
+
+## Video Walkthrough
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=VIDEO_ID">
+    <img src="https://img.shields.io/badge/Watch%20on%20YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube" height="40">
+  </a>
+</p>
+
+---
+
+## Key Features
+
+- **Dynamic Pipeline Building** — The Gemini agent plans and connects tools based on your analysis goals, no manual wiring needed.
+- **Iterative Refinement** — Pipelines are automatically reviewed and re-optimized until quality thresholds are met.
+- **Modular Tool System** — Easily extensible with function tools, class-based tools, or agent-as-tools.
+- **Full Traceability** — Every step, input, output, and parameter decision is logged and reviewable.
+- **Pipeline Persistence** — Save successful pipelines as reusable templates.
+- **Type-Safe Connections** — Automatic validation of tool input/output compatibility via Pydantic schemas.
+- **Multi-Agent Architecture** — Coordinator, Planner, and Executor agents collaborate to handle complex requests.
+- **Web & CLI Interfaces** — Use the interactive CLI or the full-stack Next.js web UI.
+
+---
 
 ## Architecture
 
@@ -18,67 +61,99 @@ NanoRange is a modular Gemini-powered system for microscopy image analysis. An i
 User Request
      │
      ▼
-┌─────────────────────────────────────────┐
-│         Orchestrator Agent              │
-│    (Gemini via Google ADK)              │
-└─────────────────────────────────────────┘
-     │
-     │ Uses Meta-Tools
-     ▼
-┌─────────────────────────────────────────┐
-│         Pipeline Engine                 │
-│  • Build pipelines                      │
-│  • Connect tool outputs to inputs       │
-│  • Validate and execute                 │
-└─────────────────────────────────────────┘
-     │
-     │ Executes
-     ▼
-┌─────────────────────────────────────────┐
-│         Tool Registry                   │
-│  • Preprocessing tools                  │
-│  • Segmentation tools                   │
-│  • Measurement tools                    │
-│  • Gemini/Agent tools                    │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│           Root Coordinator Agent            │
+│          (routes to sub-agents)             │
+└──────────────┬──────────────┬───────────────┘
+               │              │
+       ┌───────▼──────┐ ┌────▼────────────┐
+       │   Planner    │ │    Executor     │
+       │   Agent      │ │    Agent        │
+       │              │ │                 │
+       │ • Analyze    │ │ • Build pipeline│
+       │   request    │ │ • Validate      │
+       │ • Select     │ │ • Execute       │
+       │   tools      │ │ • Refine        │
+       │ • Design     │ │                 │
+       │   pipeline   │ │                 │
+       └──────────────┘ └────────┬────────┘
+                                 │
+                                 ▼
+               ┌─────────────────────────────┐
+               │       Pipeline Engine       │
+               │  • Topological execution    │
+               │  • Type validation          │
+               │  • Result storage           │
+               └──────────────┬──────────────┘
+                              │
+                              ▼
+               ┌─────────────────────────────┐
+               │       Tool Registry         │
+               ├─────────────────────────────┤
+               │ Preprocessing │ Segmentation│
+               │ Measurement   │ VLM / AI    │
+               │ I/O           │ ML (Cellpose│
+               │               │  MicroSAM)  │
+               └─────────────────────────────┘
 ```
 
-## Installation
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.10 or higher
+- A [Google Gemini API key](https://aistudio.google.com/apikey)
+- Node.js 18+ (only if using the web interface)
+
+### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/nanorange/nanorange.git
 cd nanorange
 
-# Create virtual environment
+# Create and activate a virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install dependencies
+# Install the package
 pip install -e .
 ```
 
-## Configuration
+### Configuration
 
-1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
-
-2. Create a `.env` file:
+Create a `.env` file in the project root:
 
 ```bash
-echo 'GOOGLE_API_KEY="your-api-key-here"' > .env
+GOOGLE_API_KEY="your-api-key-here"
 ```
 
-3. Initialize NanoRange:
+Then initialize the project:
 
 ```bash
 nanorange init
 ```
 
+<details>
+<summary><strong>Optional environment variables</strong></summary>
+
+| Variable              | Default                  | Description                                 |
+| --------------------- | ------------------------ | ------------------------------------------- |
+| `GEMINI_MODEL`        | `gemini-3-pro-preview`   | Model used by the orchestrator agents       |
+| `IMAGE_MODEL`         | `gemini-2.5-flash-image` | Model used for image generation/enhancement |
+| `DATABASE_PATH`       | `./data/nanorange.db`    | Path to the SQLite database                 |
+| `MAX_TOOL_ITERATIONS` | `3`                      | Max refinement iterations per tool          |
+| `REFINEMENT_ENABLED`  | `true`                   | Enable/disable adaptive refinement          |
+
+</details>
+
+---
+
 ## Usage
 
-### Interactive Chat
-
-Start an interactive session with the orchestrator:
+### Interactive Chat (CLI)
 
 ```bash
 nanorange chat
@@ -101,33 +176,36 @@ I'll create a pipeline with these steps:
 Let me build this pipeline for you...
 ```
 
-### List Available Tools
+### Web Interface
+
+Start the backend and frontend:
 
 ```bash
-nanorange tools
+# Terminal 1 — API server
+uvicorn api.main:app --reload --port 8000
+
+# Terminal 2 — Frontend
+cd frontend && npm run dev
 ```
 
-### List Saved Pipelines
+Then open [http://localhost:3000](http://localhost:3000).
 
-```bash
-nanorange pipelines
-```
+### CLI Commands
 
-### Using with ADK Web Interface
+| Command                          | Description                                            |
+| -------------------------------- | ------------------------------------------------------ |
+| `nanorange chat`                 | Start an interactive chat session                      |
+| `nanorange chat --mode planner`  | Planner-only mode (design pipelines without executing) |
+| `nanorange chat --mode executor` | Executor-only mode (run pre-built pipelines)           |
+| `nanorange tools`                | List all available tools                               |
+| `nanorange pipelines`            | List saved pipelines                                   |
+| `nanorange web --port 8000`      | Launch the ADK web interface                           |
 
-```bash
-nanorange web --port 8000
-```
-
-Or directly with ADK:
-
-```bash
-adk web --port 8000
-```
+---
 
 ## Creating Custom Tools
 
-### Function Tool
+### Function Tool (Decorator)
 
 ```python
 from nanorange.tools import tool
@@ -147,7 +225,6 @@ def my_custom_filter(image_path: str, strength: float = 0.5) -> str:
         image_path: Path to input image
         strength: Filter strength (0-1)
     """
-    # Your implementation here
     output_path = process_image(image_path, strength)
     return output_path
 ```
@@ -174,7 +251,6 @@ class MyAdvancedTool(ToolBase):
     ]
 
     def execute(self, image_path: str, threshold: float = 0.5):
-        # Your implementation
         return {
             "result_image": output_path,
             "measurements": {"count": 42, "mean_size": 100.5}
@@ -189,7 +265,7 @@ from nanorange.tools import AgentToolBase
 class GeminiEnhancerTool(AgentToolBase):
     tool_id = "gemini_enhancer"
     name = "Gemini Image Enhancer"
-    description = "Enhance images using Gemini 3.0"
+    description = "Enhance images using Gemini"
     category = "ai"
 
     def setup_agent(self):
@@ -201,65 +277,110 @@ class GeminiEnhancerTool(AgentToolBase):
         )
 
     async def execute_agent(self, image_path: str, instructions: str):
-        # Use sub-agent for enhancement
         result = await self.agent.run(f"Enhance {image_path}: {instructions}")
         return {"enhanced_image": result.output_path}
 ```
+
+---
+
+## Data Types
+
+NanoRange uses a typed connection system to validate tool compatibility:
+
+| Type           | Description                               |
+| -------------- | ----------------------------------------- |
+| `IMAGE`        | Path to an image file                     |
+| `MASK`         | Binary mask image path                    |
+| `FLOAT`        | Floating point number                     |
+| `INT`          | Integer                                   |
+| `STRING`       | Text string                               |
+| `BOOL`         | Boolean                                   |
+| `LIST`         | List of values                            |
+| `DICT`         | Dictionary                                |
+| `MEASUREMENTS` | Measurement results (counts, areas, etc.) |
+| `PARAMETERS`   | Parameter dictionary                      |
+| `INSTRUCTIONS` | Text instructions (for agent tools)       |
+
+---
 
 ## Project Structure
 
 ```
 nanorange/
-├── __init__.py
-├── main.py                    # CLI entry point
-├── agent.py                   # ADK root_agent
 ├── agent/
-│   ├── orchestrator.py        # Main ADK agent
-│   ├── prompts.py             # System prompts
-│   └── meta_tools.py          # Pipeline manipulation tools
+│   ├── agents.py              # Multi-agent system (root, planner, executor)
+│   ├── orchestrator.py        # High-level orchestration interface
+│   ├── meta_tools.py          # Pipeline manipulation tools
+│   ├── planner_tools.py       # Planner agent tools
+│   ├── prompts/               # System prompts for each agent
+│   └── refinement/            # Adaptive refinement engine
+│       ├── adaptive_executor.py
+│       ├── image_reviewer.py
+│       └── parameter_optimizer.py
 ├── core/
-│   ├── schemas.py             # Pydantic schemas
-│   ├── registry.py            # Tool registry
-│   ├── pipeline.py            # Pipeline models
+│   ├── schemas.py             # Pydantic models & data types
+│   ├── registry.py            # Tool registry (singleton)
+│   ├── pipeline.py            # Pipeline manager
 │   ├── executor.py            # Pipeline executor
 │   └── validator.py           # Pipeline validator
 ├── storage/
 │   ├── database.py            # SQLAlchemy models
-│   ├── session_manager.py     # State management
-│   └── file_store.py          # File handling
+│   ├── session_manager.py     # Session lifecycle
+│   └── file_store.py          # File management
 ├── tools/
-│   ├── base.py                # Base classes
+│   ├── base.py                # ToolBase abstract class
 │   ├── decorators.py          # @tool decorator
 │   └── builtin/               # Built-in tools
-└── cli/
-    └── commands.py            # CLI commands
+│       ├── io_tools.py
+│       ├── preprocessing.py
+│       ├── segmentation.py
+│       ├── measurement.py
+│       ├── vlm_tools/         # Vision-language model tools
+│       └── ml_tools/          # Deep learning tools (Cellpose, MicroSAM)
+├── cli/
+│   └── commands.py            # CLI entry points
+└── main.py                    # CLI main
+api/
+├── main.py                    # FastAPI application
+└── routes/                    # REST API endpoints
+frontend/                      # Next.js 16 + React 19 web UI
+tests/                         # Test suite
+docs/
+└── media/                     # Demo GIF, workflow diagram
 ```
 
-## Data Types
+---
 
-NanoRange supports these data types for tool inputs/outputs:
+## Tech Stack
 
-| Type           | Description                         |
-| -------------- | ----------------------------------- |
-| `IMAGE`        | Path to an image file               |
-| `MASK`         | Binary mask image path              |
-| `FLOAT`        | Floating point number               |
-| `INT`          | Integer                             |
-| `STRING`       | Text string                         |
-| `BOOL`         | Boolean                             |
-| `LIST`         | List of values                      |
-| `DICT`         | Dictionary                          |
-| `MEASUREMENTS` | Measurement results                 |
-| `PARAMETERS`   | Parameter dictionary                |
-| `INSTRUCTIONS` | Text instructions (for agent tools) |
+| Layer                | Technology                          |
+| -------------------- | ----------------------------------- |
+| **AI / Agents**      | Google ADK, Gemini                  |
+| **Backend**          | Python 3.10+, FastAPI, SQLAlchemy   |
+| **Frontend**         | Next.js 16, React 19, Tailwind CSS  |
+| **Image Processing** | Pillow, NumPy, SciPy                |
+| **ML Models**        | Cellpose, MicroSAM                  |
+| **Database**         | SQLite (via SQLAlchemy + aiosqlite) |
+| **CLI**              | Click, Rich                         |
 
-## License
-
-MIT License - see LICENSE file for details.
+---
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes
+4. Open a pull request
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
 
 ## Acknowledgments
 
