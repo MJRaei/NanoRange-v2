@@ -1,7 +1,7 @@
 """
-NanOrange API Server
+NanoRange API Server
 
-Main FastAPI application for the NanOrange cryo-TEM analysis tool.
+Main FastAPI application for the NanoRange cryo-TEM analysis tool.
 """
 
 import os
@@ -14,7 +14,7 @@ from api.routes.pipeline import router as pipeline_router
 from nanorange.core.registry import get_registry
 
 app = FastAPI(
-    title="NanOrange API",
+    title="NanoRange API",
     description="API for Gemini-powered nanoparticle analysis from cryo-TEM images",
     version="0.1.0"
 )
@@ -56,7 +56,7 @@ async def startup_event():
 async def root():
     """Root endpoint with API information."""
     return {
-        "name": "NanOrange API",
+        "name": "NanoRange API",
         "version": "0.1.0",
         "description": "Gemini-powered nanoparticle analysis from cryo-TEM images",
         "docs": "/docs",

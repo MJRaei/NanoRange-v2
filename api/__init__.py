@@ -1,7 +1,7 @@
 """
-NanOrange API
+NanoRange API
 
-FastAPI server for the NanOrange cryo-TEM analysis application.
+FastAPI server for the NanoRange cryo-TEM analysis application.
 """
 
 from api.main import app

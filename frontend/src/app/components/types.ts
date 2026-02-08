@@ -1,5 +1,5 @@
 /**
- * Shared TypeScript types for the NanOrange frontend
+ * Shared TypeScript types for the NanoRange frontend
  */
 
 export interface Message {

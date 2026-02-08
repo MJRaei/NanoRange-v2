@@ -1,5 +1,5 @@
 /**
- * Component exports for NanOrange frontend
+ * Component exports for NanoRange frontend
  */
 
 export { Sidebar } from "./Sidebar";

@@ -266,12 +266,12 @@ function ChatView() {
           className="relative flex items-center justify-center pl-6 pr-0 py-4 border-b shrink-0"
           style={{ borderColor: "rgba(255, 107, 53, 0.1)" }}
         >
-          {/* Centered NanOrange text with link to home */}
+          {/* Centered NanoRange text with link to home */}
           <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <NanoIcon size="small" />
             <h1 className="text-xl font-semibold">
-              <span style={{ color: "#c4b8a8" }}>Nan</span>
-              <span style={{ color: "#ff6b35" }}>Orange</span>
+              <span style={{ color: "#c4b8a8" }}>Nano</span>
+              <span style={{ color: "#ff6b35" }}>Range</span>
             </h1>
           </Link>
           {/* Right-aligned button */}
@@ -451,7 +451,7 @@ function ChatView() {
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              NanOrange may produce inaccurate results. Verify important
+              NanoRange may produce inaccurate results. Verify important
               measurements.
             </p>
           </div>

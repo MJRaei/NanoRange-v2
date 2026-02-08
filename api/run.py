@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to run the NanOrange API server.
+Script to run the NanoRange API server.
 
 Usage:
     python api/run.py [--host HOST] [--port PORT]
@@ -19,7 +19,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run the NanOrange API server")
+    parser = argparse.ArgumentParser(description="Run the NanoRange API server")
     parser.add_argument(
         "--host",
         type=str,
@@ -46,7 +46,7 @@ def main():
     
     print(f"""
 ╔══════════════════════════════════════════════════════════╗
-║                    NanOrange API Server                  ║
+║                    NanoRange API Server                  ║
 ╠══════════════════════════════════════════════════════════╣
 ║  Starting server at http://{args.host}:{args.port}                  ║
 ║  API docs available at http://localhost:{args.port}/docs        ║

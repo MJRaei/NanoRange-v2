@@ -13,8 +13,8 @@ export function Hero() {
 
       {/* App name */}
       <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-4">
-        <span style={{ color: "#c4b8a8" }}>Nan</span>
-        <span style={{ color: "#ff6b35" }}>Orange</span>
+        <span style={{ color: "#c4b8a8" }}>Nano</span>
+        <span style={{ color: "#ff6b35" }}>Range</span>
       </h1>
 
       {/* Tagline */}

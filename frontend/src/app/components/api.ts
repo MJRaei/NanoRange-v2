@@ -1,5 +1,5 @@
 /**
- * API client for communicating with the NanOrange backend
+ * API client for communicating with the NanoRange backend
  */
 
 import { AnalysisResult, SidebarFiles } from "./types";

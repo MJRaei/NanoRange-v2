@@ -1,5 +1,5 @@
 """
-API Routes for NanOrange Server
+API Routes for NanoRange Server
 """
 
 from api.routes.chat import router as chat_router
