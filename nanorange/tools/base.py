@@ -149,13 +149,13 @@ class AgentToolBase(ToolBase):
     """
     Base class for agent-as-tool implementations.
     
-    Agent tools wrap a sub-agent (e.g., an AI image generator) and expose
+    Agent tools wrap a sub-agent (e.g., a Gemini image generator) and expose
     it as a tool that can be used in pipelines.
     
     Example:
         class ImageGeneratorTool(AgentToolBase):
-            tool_id = "ai_image_generator"
-            name = "AI Image Generator"
+            tool_id = "gemini_image_generator"
+            name = "Gemini Image Generator"
             description = "Generates images using Gemini 3.0 based on text prompts"
             
             inputs = [

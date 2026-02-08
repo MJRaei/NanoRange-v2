@@ -15,7 +15,7 @@ from nanorange.core.registry import get_registry
 
 app = FastAPI(
     title="NanOrange API",
-    description="API for AI-powered nanoparticle analysis from cryo-TEM images",
+    description="API for Gemini-powered nanoparticle analysis from cryo-TEM images",
     version="0.1.0"
 )
 
@@ -58,7 +58,7 @@ async def root():
     return {
         "name": "NanOrange API",
         "version": "0.1.0",
-        "description": "AI-powered nanoparticle analysis from cryo-TEM images",
+        "description": "Gemini-powered nanoparticle analysis from cryo-TEM images",
         "docs": "/docs",
         "health": "/api/chat/health"
     }

@@ -2,11 +2,11 @@
 
 **Agentic Microscopy Image Analysis System**
 
-NanoRange is a modular AI-powered system for microscopy image analysis. An intelligent orchestrator agent dynamically builds, executes, and refines image analysis pipelines by connecting specialized tools.
+NanoRange is a modular Gemini-powered system for microscopy image analysis. An intelligent orchestrator agent dynamically builds, executes, and refines image analysis pipelines by connecting specialized tools.
 
 ## Features
 
-- **Dynamic Pipeline Building**: The AI agent plans and connects tools based on your analysis goals
+- **Dynamic Pipeline Building**: The Gemini agent plans and connects tools based on your analysis goals
 - **Modular Tool System**: Easily extensible with function tools or agent-as-tools
 - **Full Traceability**: Review all steps, inputs, and outputs of your analysis
 - **Pipeline Persistence**: Save successful pipelines for reuse
@@ -39,7 +39,7 @@ User Request
 │  • Preprocessing tools                  │
 │  • Segmentation tools                   │
 │  • Measurement tools                    │
-│  • AI/Agent tools                       │
+│  • Gemini/Agent tools                    │
 └─────────────────────────────────────────┘
 ```
 
@@ -186,9 +186,9 @@ class MyAdvancedTool(ToolBase):
 ```python
 from nanorange.tools import AgentToolBase
 
-class AIEnhancerTool(AgentToolBase):
-    tool_id = "ai_enhancer"
-    name = "AI Image Enhancer"
+class GeminiEnhancerTool(AgentToolBase):
+    tool_id = "gemini_enhancer"
+    name = "Gemini Image Enhancer"
     description = "Enhance images using Gemini 3.0"
     category = "ai"
 

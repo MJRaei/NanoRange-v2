@@ -25,7 +25,7 @@ export function Hero() {
           fontFamily: "'JetBrains Mono', monospace",
         }}
       >
-        AI-Powered Nanoparticle Analysis
+        Gemini-Powered Nanoparticle Analysis
       </p>
 
       {/* CTA Button */}

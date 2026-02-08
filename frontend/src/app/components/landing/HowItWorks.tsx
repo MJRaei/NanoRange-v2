@@ -7,7 +7,7 @@ const steps = [
   {
     number: 2,
     title: "Describe",
-    description: "Tell the AI what analysis you need",
+    description: "Tell Gemini what analysis you need",
   },
   {
     number: 3,

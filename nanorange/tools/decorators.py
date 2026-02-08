@@ -260,7 +260,7 @@ def agent_tool(
     Example:
         @agent_tool(
             tool_id="ai_enhancer",
-            name="AI Image Enhancer",
+            name="Gemini Image Enhancer",
             category="enhancement",
         )
         async def ai_enhance(image_path: str, instructions: str) -> Dict[str, Any]:

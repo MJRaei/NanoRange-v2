@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "NanOrange | Nanoparticle Image Analysis",
-  description: "AI-powered nanoparticle detection and analysis from cryo-TEM microscopy images",
+  description: "Gemini-powered nanoparticle detection and analysis from cryo-TEM microscopy images",
 };
 
 export default function RootLayout({

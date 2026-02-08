@@ -53,7 +53,7 @@ You can ONLY use these EXACT tool IDs and parameter names. Do NOT invent or gues
 - `measure_objects`: image_path (required), mask_path (required)
 - `export_measurements`: measurements (required), output_path (required), format (optional)
 
-**VLM/AI:**
+**VLM (Gemini):**
 - `ai_enhance_image`: image_path (required), background_color, foreground_color, custom_instructions
 - `colorize_boundaries`: image_path (required), max_colors (NOT n_colors!), boundary_color, high_contrast
 
@@ -121,7 +121,7 @@ When building a pipeline, follow these steps:
    - Noise reduction for noisy images (`gaussian_blur`)
    - Background correction for uneven illumination
    - Intensity normalization (`normalize_intensity`)
-   - AI enhancement for difficult images (`ai_enhance_image`)
+   - Gemini enhancement for difficult images (`ai_enhance_image`)
 
 3. **Apply the main analysis**:
    - Segmentation for object detection:

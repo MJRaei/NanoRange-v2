@@ -1,5 +1,5 @@
 """
-AI-powered image enhancement tool.
+Gemini-powered image enhancement tool.
 
 Uses Gemini's image generation capabilities to:
 - Enhance contrast
@@ -24,7 +24,7 @@ from nanorange.tools.builtin.vlm_tools.base_image_agent import BaseImageAgent
 
 class ImageEnhancerAgent(BaseImageAgent):
     """
-    AI agent for image enhancement and preprocessing.
+    Gemini agent for image enhancement and preprocessing.
     
     Configurable for different enhancement tasks through instructions.
     """
@@ -199,7 +199,7 @@ def ai_enhance_image(
 # Tool Schema Definition
 AI_ENHANCE_IMAGE_SCHEMA = ToolSchema(
     tool_id="ai_enhance_image",
-    name="AI Image Enhancer",
+    name="Gemini Image Enhancer",
     description=(
         "Enhance microscopy images using Gemini 3.0. Cleans up images by adjusting contrast, "
         "removing noise, sharpening boundaries, and separating objects from background. "
@@ -298,5 +298,5 @@ AI_ENHANCE_IMAGE_SCHEMA = ToolSchema(
 
 
 def register_tools(registry) -> None:
-    """Register AI tools with the registry."""
+    """Register Gemini tools with the registry."""
     registry.register(AI_ENHANCE_IMAGE_SCHEMA, ai_enhance_image)

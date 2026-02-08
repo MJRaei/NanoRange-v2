@@ -17,7 +17,7 @@ const features = [
     ),
     title: "Instant Detection",
     description:
-      "Upload TEM or SEM images. AI identifies and counts nanoparticles automatically.",
+      "Upload TEM or SEM images. Gemini identifies and counts nanoparticles automatically.",
   },
   {
     icon: (

@@ -152,7 +152,7 @@ export function PipelineToolbar({
           <label
             htmlFor="adaptive-mode"
             className="text-xs text-gray-400 cursor-pointer select-none"
-            title="Adaptive mode uses AI to review outputs and automatically adjust parameters for better results"
+            title="Adaptive mode uses Gemini to review outputs and automatically adjust parameters for better results"
           >
             Adaptive
           </label>

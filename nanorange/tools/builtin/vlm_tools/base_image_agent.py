@@ -1,7 +1,7 @@
 """
-Base class for Gemini AI image processing agents.
+Base class for Gemini image processing agents.
 
-Provides common functionality for AI-powered image tools including:
+Provides common functionality for Gemini-powered image tools including:
 - Client initialization
 - Token usage tracking
 - Image processing pipeline
@@ -18,7 +18,7 @@ from nanorange.settings import GOOGLE_API_KEY
 
 class BaseImageAgent:
     """
-    Base class for Gemini AI image processing agents.
+    Base class for Gemini image processing agents.
     
     Handles client initialization, image processing, and token tracking.
     Subclasses should override the instruction or provide it at runtime.
@@ -55,7 +55,7 @@ class BaseImageAgent:
         instruction: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Process a single image with Gemini AI.
+        Process a single image with Gemini.
         
         Args:
             input_path: Path to the input image

@@ -60,13 +60,13 @@ You MUST use these EXACT tool IDs and parameter names. Do NOT invent or guess na
   - `output_path` (required): Output file path
   - `format` (optional, default="json"): "json" or "csv"
 
-### VLM (AI-Powered) Tools
-- `ai_enhance_image` - AI-powered image enhancement/contrast
+### VLM (Gemini-Powered) Tools
+- `ai_enhance_image` - Gemini-powered image enhancement/contrast
   - `image_path` (required): Input image
   - `background_color` (optional, default="black"): Expected background
   - `foreground_color` (optional, default="white"): Expected foreground
   - `custom_instructions` (optional): Additional instructions
-- `colorize_boundaries` - AI-powered boundary colorization
+- `colorize_boundaries` - Gemini-powered boundary colorization
   - `image_path` (required): Input image with boundaries
   - `max_colors` (optional, default=10): Number of colors (NOT n_colors!)
   - `boundary_color` (optional, default="white"): Current boundary color
@@ -119,7 +119,7 @@ You MUST use these EXACT tool IDs and parameter names. Do NOT invent or guess na
 
 1. **Start with input**: Always begin with `load_image`
 2. **Preprocess as needed**: Add noise reduction or enhancement based on image quality
-3. **Main analysis**: Segmentation, detection, or AI processing
+3. **Main analysis**: Segmentation, detection, or Gemini processing
 4. **Post-processing**: Clean up results, label objects
 5. **Measurements**: Extract quantitative data if needed
 6. **Output**: Save results or export measurements
@@ -130,7 +130,7 @@ NanoRange has **iterative refinement** that can automatically optimize parameter
 
 ### How It Works
 - When the user doesn't specify exact parameter values, the system can try different values
-- An AI image reviewer evaluates each output and decides if it can be improved
+- A Gemini image reviewer evaluates each output and decides if it can be improved
 - Parameters are automatically adjusted and tools re-run (up to 3 iterations by default)
 - Tools that don't work for a specific image can be automatically removed
 

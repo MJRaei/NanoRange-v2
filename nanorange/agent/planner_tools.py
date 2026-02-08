@@ -220,7 +220,7 @@ def analyze_image_for_planning(image_path: str) -> Dict[str, Any]:
         if analysis.get("quality_hints", {}).get("low_contrast"):
             analysis["recommendations"].append("Consider contrast enhancement or normalization")
         if analysis.get("quality_hints", {}).get("high_noise_likely"):
-            analysis["recommendations"].append("Consider noise reduction (gaussian blur or AI enhancement)")
+            analysis["recommendations"].append("Consider noise reduction (gaussian blur or Gemini enhancement)")
         
         return analysis
         

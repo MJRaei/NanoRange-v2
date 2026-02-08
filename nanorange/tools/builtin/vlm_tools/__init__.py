@@ -5,7 +5,7 @@ These tools use Gemini's vision and image generation capabilities for
 advanced image processing tasks.
 
 Available tools:
-- ai_enhance_image: Enhance contrast, remove noise, sharpen boundaries
+- ai_enhance_image: Gemini-powered contrast enhancement, noise removal, boundary sharpening
 - colorize_boundaries: Assign distinct colors to object boundaries
 """
 

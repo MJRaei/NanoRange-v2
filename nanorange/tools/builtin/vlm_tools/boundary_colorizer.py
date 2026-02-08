@@ -1,5 +1,5 @@
 """
-AI-powered boundary colorization tool.
+Gemini-powered boundary colorization tool.
 
 Uses Gemini's image generation capabilities to:
 - Assign distinct colors to particle/object boundaries
@@ -23,7 +23,7 @@ from nanorange.tools.builtin.vlm_tools.base_image_agent import BaseImageAgent
 
 class BoundaryColorizerAgent(BaseImageAgent):
     """
-    AI agent for boundary colorization.
+    Gemini agent for boundary colorization.
     
     Assigns distinct colors to object boundaries for visual differentiation.
     """

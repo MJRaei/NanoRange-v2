@@ -1,7 +1,7 @@
 """
 NanoRange: Agentic Microscopy Image Analysis System
 
-A modular system where an AI agent dynamically builds, executes, 
+A modular system where a Gemini-powered agent dynamically builds, executes, 
 and refines image analysis pipelines by connecting registered tools.
 """
 
