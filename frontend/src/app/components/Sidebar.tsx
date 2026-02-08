@@ -11,38 +11,34 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onToggle, onNavigate }: SidebarProps) {
   return (
     <>
-      {/* Toggle Button - Icon only, text on hover */}
-      <button
-        onClick={onToggle}
-        className="group fixed left-4 top-4 z-50 p-2.5 rounded-lg transition-all hover:scale-105"
-        style={{
-          backgroundColor: "rgba(255, 107, 53, 0.15)",
-          border: "1px solid rgba(255, 107, 53, 0.3)",
-          color: "#ff6b35",
-        }}
-        title={isOpen ? "Close Sidebar" : "Open Sidebar"}
-      >
-        {isOpen ? (
+      {/* Close Button - Only visible when sidebar is open */}
+      {isOpen && (
+        <button
+          onClick={onToggle}
+          className="group fixed left-4 top-4 z-50 p-2.5 rounded-lg transition-all hover:scale-105"
+          style={{
+            backgroundColor: "rgba(255, 107, 53, 0.15)",
+            border: "1px solid rgba(255, 107, 53, 0.3)",
+            color: "#ff6b35",
+          }}
+          title="Close Sidebar"
+        >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
-        ) : (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        )}
-        {/* Tooltip on hover */}
-        <span
-          className="absolute left-full ml-2 px-2 py-1 rounded text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-          style={{
-            backgroundColor: "#1a1816",
-            border: "1px solid rgba(255, 107, 53, 0.3)",
-            color: "#c4b8a8",
-          }}
-        >
-          {isOpen ? "Close Sidebar" : "Open Sidebar"}
-        </span>
-      </button>
+          {/* Tooltip on hover */}
+          <span
+            className="absolute left-full ml-2 px-2 py-1 rounded text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+            style={{
+              backgroundColor: "#1a1816",
+              border: "1px solid rgba(255, 107, 53, 0.3)",
+              color: "#c4b8a8",
+            }}
+          >
+            Close Sidebar
+          </span>
+        </button>
+      )}
 
       {/* Sidebar Panel */}
       <div
