@@ -7,19 +7,17 @@ Centralizes all configuration values including API keys and model settings.
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Google API Configuration
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
 # Model Configuration
 DEFAULT_LLM_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-pro-preview")
-IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-3-pro-image-preview")
 IMAGE_MODEL_COLORIZER = os.getenv("GEMINI_IMAGE_MODEL_COLORIZER", "gemini-3-pro-image-preview")
 
 # Image Reviewer Model - for iterative refinement feedback
-IMAGE_REVIEWER_MODEL = os.getenv("IMAGE_REVIEWER_MODEL", "gemini-2.5-flash-image")
+IMAGE_REVIEWER_MODEL = os.getenv("IMAGE_REVIEWER_MODEL", "gemini-3-pro-image-preview")
 
 # Storage Configuration
 DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/nanorange.db")
