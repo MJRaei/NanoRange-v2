@@ -2,8 +2,22 @@
 
 import Link from "next/link";
 import { NanoIcon } from "../NanoIcon";
+import { useEffect, useState } from "react";
+
+const techBadges = [
+  "Gemini 3.0",
+  "Multi-Agent",
+  "Google ADK",
+  "10+ Tools",
+];
 
 export function Hero() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <section className="flex flex-col items-center pt-10 md:pt-16 px-6 pb-16 md:pb-24">
       {/* Icon container */}
@@ -19,14 +33,46 @@ export function Hero() {
 
       {/* Tagline */}
       <p
-        className="text-lg md:text-xl tracking-wide mb-12 text-center max-w-md"
+        className="text-lg md:text-xl tracking-wide mb-3 text-center max-w-lg"
         style={{
           color: "#8a857d",
           fontFamily: "'JetBrains Mono', monospace",
         }}
       >
-        Gemini-Powered Nanoparticle Analysis
+        An Agentic Framework for Microscopy Image Analysis
       </p>
+
+      {/* Vision statement */}
+      <p
+        className="text-sm tracking-wide mb-8 text-center max-w-md"
+        style={{
+          color: "#6a655d",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}
+      >
+        So researchers can focus on discovery, not configuration.
+      </p>
+
+      {/* Tech badges */}
+      <div className="flex flex-wrap justify-center gap-2 mb-10">
+        {techBadges.map((badge, i) => (
+          <span
+            key={badge}
+            className="tech-badge text-xs px-3 py-1.5 rounded-full transition-all duration-300"
+            style={{
+              backgroundColor: "rgba(255, 107, 53, 0.08)",
+              border: "1px solid rgba(255, 107, 53, 0.2)",
+              color: "#ff8c5a",
+              fontFamily: "'JetBrains Mono', monospace",
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? "translateY(0)" : "translateY(10px)",
+              transition: `opacity 0.5s ease ${0.3 + i * 0.1}s, transform 0.5s ease ${0.3 + i * 0.1}s`,
+            }}
+          >
+            {badge}
+          </span>
+        ))}
+      </div>
 
       {/* CTA Button */}
       <Link
