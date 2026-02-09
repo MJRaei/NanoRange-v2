@@ -7,6 +7,7 @@ import {
   Toolbox,
   HowItWorks,
   WhatsNext,
+  DemoShowcase,
 } from "./components/landing";
 
 export default function LandingPage() {
@@ -21,6 +22,10 @@ export default function LandingPage() {
         <Hero />
 
         {/* Divider */}
+        <div className="section-divider mx-auto max-w-3xl" />
+
+        <DemoShowcase />
+
         <div className="section-divider mx-auto max-w-3xl" />
 
         <AgentPipeline />

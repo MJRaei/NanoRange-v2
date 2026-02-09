@@ -9,3 +9,4 @@ export { AgentPipeline } from "./AgentPipeline";
 export { Toolbox } from "./Toolbox";
 export { HowItWorks } from "./HowItWorks";
 export { WhatsNext } from "./WhatsNext";
+export { DemoShowcase } from "./DemoShowcase";
