@@ -15,9 +15,13 @@ aiosqlite>=0.19.0
 click>=8.0.0
 rich>=13.0.0
 
-# Image handling (basic - more can be added for specific tools)
+# Image handling
 Pillow>=10.0.0
 numpy>=1.24.0
+scipy>=1.10.0
+
+# ML segmentation
+cellpose>=3.0.0
 
 # Async support
 anyio>=4.0.0
