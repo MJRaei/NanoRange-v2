@@ -55,50 +55,6 @@
 
 ---
 
-## Architecture
-
-```
-User Request
-     │
-     ▼
-┌─────────────────────────────────────────────┐
-│           Root Coordinator Agent            │
-│          (routes to sub-agents)             │
-└──────────────┬──────────────┬───────────────┘
-               │              │
-       ┌───────▼──────┐ ┌────▼────────────┐
-       │   Planner    │ │    Executor     │
-       │   Agent      │ │    Agent        │
-       │              │ │                 │
-       │ • Analyze    │ │ • Build pipeline│
-       │   request    │ │ • Validate      │
-       │ • Select     │ │ • Execute       │
-       │   tools      │ │ • Refine        │
-       │ • Design     │ │                 │
-       │   pipeline   │ │                 │
-       └──────────────┘ └────────┬────────┘
-                                 │
-                                 ▼
-               ┌─────────────────────────────┐
-               │       Pipeline Engine       │
-               │  • Topological execution    │
-               │  • Type validation          │
-               │  • Result storage           │
-               └──────────────┬──────────────┘
-                              │
-                              ▼
-               ┌─────────────────────────────┐
-               │       Tool Registry         │
-               ├─────────────────────────────┤
-               │ Preprocessing │ Segmentation│
-               │ Measurement   │ VLM / AI    │
-               │ I/O           │ ML (Cellpose│
-               │               │  MicroSAM)  │
-               └─────────────────────────────┘
-```
-
----
-
 ## Quick Start
 
 ### Prerequisites
