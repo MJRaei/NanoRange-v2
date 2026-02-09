@@ -239,26 +239,6 @@ class GeminiEnhancerTool(AgentToolBase):
 
 ---
 
-## Data Types
-
-NanoRange uses a typed connection system to validate tool compatibility:
-
-| Type           | Description                               |
-| -------------- | ----------------------------------------- |
-| `IMAGE`        | Path to an image file                     |
-| `MASK`         | Binary mask image path                    |
-| `FLOAT`        | Floating point number                     |
-| `INT`          | Integer                                   |
-| `STRING`       | Text string                               |
-| `BOOL`         | Boolean                                   |
-| `LIST`         | List of values                            |
-| `DICT`         | Dictionary                                |
-| `MEASUREMENTS` | Measurement results (counts, areas, etc.) |
-| `PARAMETERS`   | Parameter dictionary                      |
-| `INSTRUCTIONS` | Text instructions (for agent tools)       |
-
----
-
 ## Project Structure
 
 ```
