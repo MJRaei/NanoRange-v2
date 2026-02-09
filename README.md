@@ -35,7 +35,7 @@
 ## Video Walkthrough
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=VIDEO_ID">
+  <a href="https://youtu.be/9ur8fZo4_lg?si=w9c6qI4XDDn_Lybs">
     <img src="https://img.shields.io/badge/Watch%20on%20YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube" height="40">
   </a>
 </p>
