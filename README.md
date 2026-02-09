@@ -32,6 +32,20 @@
 
 ---
 
+## Demos
+
+<p align="center">
+  <strong>Interactive Canvas</strong><br>
+  <img src="docs/media/demo_canvas.gif" alt="Interactive Canvas Demo" width="720">
+</p>
+
+<p align="center">
+  <strong>AI Chat</strong><br>
+  <img src="docs/media/demo_chat.gif" alt="AI Chat Demo" width="720">
+</p>
+
+---
+
 ## Video Walkthrough
 
 <p align="center">
